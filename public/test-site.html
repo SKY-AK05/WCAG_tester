@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<!-- VIOLATION 3.1.1: Missing Language of Page -->
+<html>
+<head>
+    <title>WCAG Violation Test Case</title>
+    <style>
+        body { font-family: Arial; padding: 40px; background: white; color: #333; }
+        .bad-contrast {
+            /* VIOLATION 1.4.3: Contrast (Minimum) */
+            color: #d1d1d1;
+            background: #ffffff;
+            padding: 20px;
+            font-size: 14px;
+        }
+        .empty-btn {
+            /* VIOLATION 4.1.2: Name, Role, Value */
+            width: 40px;
+            height: 40px;
+            background: red;
+            border: none;
+            cursor: pointer;
+        }
+        .spacer { height: 20px; }
+    </style>
+</head>
+<body>
+    <!-- VIOLATION 2.4.6: Headings skip level (h1 to h3) -->
+    <h1>WCAG Test Laboratory</h1>
+    <div class="spacer"></div>
+    <h3>Accessibility Violations Below</h3>
+
+    <section>
+        <h4>1. Non-text Content</h4>
+        <!-- VIOLATION 1.1.1: Missing Alternate Text -->
+        <img src="https://via.placeholder.com/300" width="300" height="150" />
+    </section>
+
+    <section>
+        <h4>2. Color Contrast</h4>
+        <div class="bad-contrast">
+            This text has very poor contrast against the background and is hard to read for users with low vision.
+        </div>
+    </section>
+
+    <section>
+        <h4>3. Missing Labels</h4>
+        <div>
+            <!-- VIOLATION 3.3.2: No Label for Input -->
+            <input type="text" placeholder="Enter name here (no label)" />
+        </div>
+    </section>
+
+    <section>
+        <h4>4. Keyboard Accessibility</h4>
+        <!-- VIOLATION 2.1.1: Interactive item with no role/text -->
+        <button class="empty-btn"></button>
+    </section>
+
+    <section>
+        <h4>5. Empty Link</h4>
+        <!-- VIOLATION 2.4.4: Empty Link with no purpose -->
+        <a href="#"></a>
+    </section>
+
+    <section>
+        <h4>6. Low Contrast Footer</h4>
+        <footer style="color: #999; font-size: 10px;">
+            Confidential - 2026 Test Site
+        </footer>
+    </section>
+</body>
+</html>

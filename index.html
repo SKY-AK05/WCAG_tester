@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI WCAG 2.2 Auditor | Orchvate</title>
+    <!-- Socket.io & Lucide -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- Entry Interface -->
+    <main id="entry-screen" class="entry-screen">
+      <div class="entry-card glass-effect glass-card animate-fade-in">
+        <div class="logo-container">
+          <div class="logo-icon">🔍</div>
+          <h1 class="logo-text">AI WCAG 2.2 <span class="accent">Auditor</span></h1>
+        </div>
+        <p class="entry-description">Automated Accessibility Auditing with Human-Ready AI Insights.</p>
+        <div class="url-input-group">
+          <input type="url" id="target-url" placeholder="Enter website URL (e.g., https://example.com)" required />
+          <button id="start-scan-btn" class="btn-primary">
+            <i data-lucide="zap"></i>
+            Start Scan
+          </button>
+        </div>
+        <div class="scan-options">
+          <label class="custom-checkbox">
+            <input type="checkbox" id="ai-assisted" checked />
+            <span class="checkmark"></span>
+            Enable AI-Assisted Semantic Review (Slower, but deeper)
+          </label>
+        </div>
+      </div>
+      <div class="entry-background">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+      </div>
+    </main>
+
+    <!-- App Shell (Hidden Initially) -->
+    <div id="app-shell" class="app-container hidden">
+      <!-- Header -->
+      <header class="header glass-effect">
+        <div class="header-left">
+          <div class="mini-logo">🔍</div>
+          <div class="current-url-display">
+            <span class="label">Auditing:</span>
+            <span id="display-url" class="value">...</span>
+          </div>
+        </div>
+        <div class="header-center">
+          <div class="score-card">
+            <div class="score-ring">
+              <svg viewBox="0 0 36 36" class="circular-chart">
+                <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path id="score-path" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <text x="18" y="20.35" class="percentage" id="score-value">0</text>
+              </svg>
+            </div>
+            <div class="score-label">Accessibility Score</div>
+          </div>
+          <div class="stat-group">
+            <div class="stat-item">
+              <span id="stat-total-issues" class="stat-value">0</span>
+              <span class="stat-label">Total Issues</span>
+            </div>
+            <div class="stat-item">
+              <span id="stat-critical" class="stat-value critical">0</span>
+              <span class="stat-label">Critical</span>
+            </div>
+            <div class="stat-item fixed-counter">
+              <span id="stat-fixed" class="stat-value success">0</span>
+              <span class="stat-label">Fixed</span>
+            </div>
+          </div>
+        </div>
+        <div class="header-right">
+          <button class="btn-ghost" id="export-btn">
+            <i data-lucide="download"></i>
+            Export Report
+          </button>
+          <button class="btn-ghost icon-only" id="theme-toggle">
+            <i data-lucide="moon"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Sidebar -->
+      <aside class="sidebar glass-effect">
+        <div class="sidebar-section">
+          <h3>WCAG Levels</h3>
+          <div class="filter-group">
+            <label><input type="checkbox" value="A" checked> Level A</label>
+            <label><input type="checkbox" value="AA" checked> Level AA</label>
+            <label><input type="checkbox" value="AAA"> Level AAA</label>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <h3>Severity</h3>
+          <div class="filter-group">
+            <label><input type="checkbox" value="critical" checked> <span class="dot critical"></span> Critical</label>
+            <label><input type="checkbox" value="serious" checked> <span class="dot serious"></span> Serious</label>
+            <label><input type="checkbox" value="moderate" checked> <span class="dot moderate"></span> Moderate</label>
+            <label><input type="checkbox" value="minor" checked> <span class="dot minor"></span> Minor</label>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <h3>Status</h3>
+          <div class="filter-group">
+            <label><input type="checkbox" value="fail" checked> Fail</label>
+            <label><input type="checkbox" value="review" checked> Needs Review</label>
+            <label><input type="checkbox" value="pass"> Pass</label>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content (Issue List) -->
+      <main class="main-content">
+        <div class="content-header">
+          <h2>Detected Issues</h2>
+          <div class="search-box">
+            <i data-lucide="search"></i>
+            <input type="text" id="issue-search" placeholder="Search rules or elements..." />
+          </div>
+        </div>
+        <div class="table-container glass-effect">
+          <table id="issue-table">
+            <thead>
+              <tr>
+                <th>Rule ID</th>
+                <th>Guideline Title</th>
+                <th>Status</th>
+                <th>Severity</th>
+                <th>Elements</th>
+              </tr>
+            </thead>
+            <tbody id="issue-list-body">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </main>
+
+      <!-- Detail Panel (Initially empty/hidden) -->
+      <section id="detail-panel" class="detail-panel glass-effect hidden">
+        <div class="panel-header">
+          <button class="close-panel"><i data-lucide="x"></i></button>
+          <h3 id="detail-title">Issue Details</h3>
+          <div id="detail-badge" class="badge">CRITICAL</div>
+        </div>
+        <div class="panel-scroll-area">
+          <div class="detail-section">
+            <h4>Description</h4>
+            <p id="detail-desc">...</p>
+          </div>
+          <div class="detail-section">
+            <h4>Impact</h4>
+            <p id="detail-impact">...</p>
+          </div>
+          <div class="detail-section">
+            <h4>Affected Element</h4>
+            <div class="code-block glass-effect">
+              <code id="detail-code">...</code>
+              <button class="copy-code"><i data-lucide="copy"></i></button>
+            </div>
+            <p id="detail-selector" class="selector-path">...</p>
+          </div>
+          <div class="detail-section">
+            <h4>AI Fix Suggestion</h4>
+            <div class="ai-suggestion-box glass-effect">
+              <div class="ai-header">
+                <i data-lucide="sparkles"></i> AI Recommends
+              </div>
+              <div id="detail-ai-fix">...</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel-footer">
+          <button class="btn-primary" id="validate-issue">Mark as Fixed</button>
+          <button class="btn-ghost" id="ignore-issue">Ignore</button>
+        </div>
+      </section>
+
+      <!-- AI Chat Interface -->
+      <div id="chat-container" class="chat-container glass-effect">
+        <div class="chat-header">
+          <i data-lucide="message-square"></i>
+          <span>Accessibility Assistant</span>
+          <button class="minimize-chat"><i data-lucide="chevron-down"></i></button>
+        </div>
+        <div id="chat-messages" class="chat-messages">
+          <div class="message ai-message">
+            Hi! I'm your WCAG assistant. How can I help you fix these issues?
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <input type="text" id="chat-input" placeholder="Ask about a rule or fix..." />
+          <button id="send-chat-btn"><i data-lucide="send"></i></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+      <div class="loading-content">
+        <div class="spinner"></div>
+        <h2 id="loading-status">Scanning Page...</h2>
+        <p id="loading-progress">Initializing Playwright scraper...</p>
+        <div class="progress-bar-container">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
