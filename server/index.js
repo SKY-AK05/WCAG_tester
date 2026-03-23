@@ -34,30 +34,43 @@ async function getAIReview(issue, contextData) {
     return "AI-driven fix analysis requires a valid Gemini API key. Please check your .env file.";
   }
 
+  const prompt = `
+    You are an expert Web Accessibility Auditor (WCAG 2.2 Specialist).
+    Analyze the following accessibility issue and provide a human-readable fix.
+    **Rule**: ${issue.title} (${issue.rule_id})
+    **WCAG Guideline**: ${issue.level}
+    **Affected Element HTML**: \`${issue.elements[0]?.html}\`
+    **Failure Summary**: ${issue.elements[0]?.summary}
+    Please provide:
+    1. **Explanation**: Why this is an issue for users with disabilities.
+    2. **Fix**: Specific code or attribute changes needed to resolve it.
+    3. **Best Practice**: A one-line tip to avoid this in the future.
+    Format the output with light HTML (bold, lists) but NO markdown backticks in the response.
+  `;
+
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const prompt = `
-      You are an expert Web Accessibility Auditor (WCAG 2.2 Specialist).
-      Analyze the following accessibility issue and provide a human-readable fix.
-
-      **Rule**: ${issue.title} (${issue.rule_id})
-      **WCAG Guideline**: ${issue.level}
-      **Affected Element HTML**: \`${issue.elements[0]?.html}\`
-      **Failure Summary**: ${issue.elements[0]?.summary}
-
-      Please provide:
-      1. **Explanation**: Why this is an issue for users with disabilities.
-      2. **Fix**: Specific code or attribute changes needed to resolve it.
-      3. **Best Practice**: A one-line tip to avoid this in the future.
-
-      Format the output with light HTML (bold, lists) but NO markdown backticks in the response.
-    `;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return (await response.text());
+    const modelsToTry = ["gemini-flash-latest", "gemini-pro-latest", "gemini-2.0-flash", "gemini-2.5-flash"];
+    let lastError = null;
+    
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`[AI] Attempting review with: ${modelName}`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return (await response.text());
+      } catch (err) {
+        lastError = err;
+        if (err.status === 404) {
+          console.warn(`[AI] Model ${modelName} not found, trying fallback...`);
+          continue;
+        }
+        throw err; 
+      }
+    }
+    throw lastError;
   } catch (error) {
-    console.error("Gemini Error:", error);
+    console.error("Gemini Error:", error.message);
     return "AI analysis failed. Please check logs.";
   }
 }
@@ -202,7 +215,39 @@ io.on('connection', (socket) => {
   
   socket.on('chat-message', async (data) => {
     console.log(`[CHAT] Message received: ${data.text}`);
-    socket.emit('chat-response', `I see you're asking about target issues. Once I have the full DOM context, I can give you a more precise fix. Based on what was scanned, ensure you have proper aria-labels.`);
+    if (!process.env.GEMINI_API_KEY) {
+      return socket.emit('chat-response', "AI is currently offline (No API key found).");
+    }
+
+    try {
+      const modelsToTry = ["gemini-flash-latest", "gemini-pro-latest", "gemini-2.0-flash", "gemini-2.5-flash"];
+      const context = JSON.stringify(data.context || {});
+      const chatPrompt = `
+        You are an Accessibility Assistant.
+        User asks: ${data.text}
+        Previous findings context: ${context}
+        Provide a concise, helpful answer on how to fix the issue or understand the rule.
+      `;
+
+      let success = false;
+      for (const modelName of modelsToTry) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent(chatPrompt);
+          const response = await result.response;
+          socket.emit('chat-response', (await response.text()));
+          success = true;
+          break;
+        } catch (mErr) {
+          if (mErr.status === 404) continue;
+          throw mErr;
+        }
+      }
+      if (!success) throw new Error("All AI models returned 404.");
+    } catch (err) {
+      console.error("Chat AI error:", err);
+      socket.emit('chat-response', "Sorry, I had trouble processing that request. My AI engine might be busy.");
+    }
   });
 
   socket.on('disconnect', () => {
