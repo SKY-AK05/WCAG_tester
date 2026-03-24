@@ -120,23 +120,52 @@ async function runScan(targetUrl, socket, options) {
     
     socket.emit('scan-progress', { status: 'Processing', progress: 70, details: 'Mapping violations to WCAG 2.2...' });
     
-    // Process results
-    const processedIssues = axeResults.violations.map(v => ({
-      rule_id: v.id,
-      title: v.help,
-      description: v.description,
-      status: 'fail',
-      severity: v.impact === 'critical' ? 'critical' : (v.impact === 'serious' ? 'serious' : (v.impact === 'moderate' ? 'moderate' : 'minor')),
-      level: mapToWCAGLevel(v.id), 
-      category: 'Perceivable',
-      elements: v.nodes.map(n => ({
-        html: n.html,
-        selector: n.target.join(' > '),
-        summary: n.failureSummary
-      })),
-      why_matters: "Accessibility violations impact users with disabilities and can lead to legal non-compliance.",
-      ai_suggestion: "Pending AI Review..."
-    }));
+    // Process results and capture screenshots
+    socket.emit('scan-progress', { status: 'Capturing Evidence', progress: 70, details: 'Taking visual snippets of violations...' });
+    
+    const processedIssues = [];
+    for (const v of axeResults.violations) {
+      const elements = [];
+      
+      for (let i = 0; i < v.nodes.length; i++) {
+        const n = v.nodes[i];
+        const selector = n.target.join(' > ');
+        let screenshotBase64 = null;
+        
+        // Only take 1 screenshot per issue for performance
+        if (i === 0) {
+          try {
+            const locator = page.locator(selector).first();
+            // Ensure element is visible before screenshot
+            await locator.scrollIntoViewIfNeeded({ timeout: 2000 });
+            const buffer = await locator.screenshot({ timeout: 3000 });
+            screenshotBase64 = buffer.toString('base64');
+          } catch (e) {
+            console.warn(`[SCAN] Could not capture screenshot for ${selector}:`, e.message);
+          }
+        }
+        
+        elements.push({
+          html: n.html,
+          selector: selector,
+          summary: n.failureSummary,
+          screenshot: screenshotBase64
+        });
+      }
+
+      processedIssues.push({
+        rule_id: v.id,
+        title: v.help,
+        description: v.description,
+        status: 'fail',
+        severity: v.impact === 'critical' ? 'critical' : (v.impact === 'serious' ? 'serious' : (v.impact === 'moderate' ? 'moderate' : 'minor')),
+        level: mapToWCAGLevel(v.id), 
+        category: 'Perceivable',
+        elements: elements,
+        why_matters: "Accessibility violations impact users with disabilities and can lead to legal non-compliance.",
+        ai_suggestion: "Pending AI Review..."
+      });
+    }
 
     if (options.aiAssisted && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'YOUR_GEMINI_API_KEY_HERE') {
       socket.emit('scan-progress', { status: 'AI Reviewing', progress: 85, details: 'Performing semantic and UX analysis on key issues...' });

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -8,125 +8,338 @@
     <!-- Socket.io & Lucide -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.dots.min.js"></script>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <!-- Entry Interface -->
-    <main id="entry-screen" class="entry-screen">
-      <div class="entry-card glass-effect glass-card animate-fade-in">
+    <main id="entry-screen" class="entry-screen" style="background: transparent;">
+      <div id="vanta-bg" style="position: absolute; inset: 0; z-index: 1;"></div>
+      <div class="entry-card animate-fade-in">
         <div class="logo-container">
-          <div class="logo-icon">🔍</div>
-          <h1 class="logo-text">AI WCAG 2.2 <span class="accent">Auditor</span></h1>
+          <h1 class="logo-text">AI WCAG 2.2</h1>
+          <div class="auditor-tag">Auditor</div>
         </div>
-        <p class="entry-description">Automated Accessibility Auditing with Human-Ready AI Insights.</p>
+        <p class="entry-description">Automated Accessibility Auditing with Human-Ready AI Insights</p>
+        
         <div class="url-input-group">
-          <input type="url" id="target-url" placeholder="Enter website URL (e.g., https://example.com)" required />
-          <button id="start-scan-btn" class="btn-primary">
-            <i data-lucide="zap"></i>
+          <input type="url" id="target-url" placeholder="Enter website URL (e.g. https://...)" required />
+          <button id="start-scan-btn" class="btn-primary" style="padding: 12px 28px; font-size: 0.95rem; border-radius: var(--border-radius-pill); white-space: nowrap; background: #ff260f; color: white; border: none; cursor: pointer; font-weight: 800; box-shadow: 0 4px 12px rgba(255, 38, 15, 0.3);">
             Start Scan
           </button>
         </div>
-        <div class="scan-options">
-          <label class="custom-checkbox">
-            <input type="checkbox" id="ai-assisted" checked />
-            <span class="checkmark"></span>
-            Enable AI-Assisted Semantic Review (Slower, but deeper)
-          </label>
+
+        <div class="scan-options" style="display: flex; align-items: center; gap: 12px; margin-top: 24px;">
+          <input type="checkbox" id="ai-assisted" style="width: 20px; height: 20px;" checked />
+          <label for="ai-assisted" style="font-weight: 600; font-size: 0.95rem; opacity: 0.7;">Enable AI-Assisted Semantic Review (Slower, but deeper)</label>
         </div>
-      </div>
-      <div class="entry-background">
-        <div class="blob blob-1"></div>
-        <div class="blob blob-2"></div>
       </div>
     </main>
 
     <!-- App Shell (Hidden Initially) -->
     <div id="app-shell" class="app-container hidden">
-      <!-- Header -->
-      <header class="header glass-effect">
-        <div class="header-left">
-          <div class="mini-logo">🔍</div>
-          <div class="current-url-display">
-            <span class="label">Auditing:</span>
-            <span id="display-url" class="value">...</span>
-          </div>
-        </div>
-        <div class="header-center">
-          <div class="score-card">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <!-- 1. Score Card -->
+        <div class="sidebar-section" style="margin-top: 20px; width: 100%">
+          <div class="score-card" style="width: 100%">
             <div class="score-ring">
               <svg viewBox="0 0 36 36" class="circular-chart">
-                <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                <path id="score-path" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                <text x="18" y="20.35" class="percentage" id="score-value">0</text>
+                <path
+                  class="circle-bg"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  id="score-path"
+                  class="circle"
+                  stroke-dasharray="0, 100"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <text x="18" y="20.35" class="percentage" id="score-value">
+                  0
+                </text>
               </svg>
             </div>
-            <div class="score-label">Accessibility Score</div>
-          </div>
-          <div class="stat-group">
-            <div class="stat-item">
-              <span id="stat-total-issues" class="stat-value">0</span>
-              <span class="stat-label">Total Issues</span>
-            </div>
-            <div class="stat-item">
-              <span id="stat-critical" class="stat-value critical">0</span>
-              <span class="stat-label">Critical</span>
-            </div>
-            <div class="stat-item fixed-counter">
-              <span id="stat-fixed" class="stat-value success">0</span>
-              <span class="stat-label">Fixed</span>
+            <div
+              class="score-label"
+              style="
+                font-size: 0.75rem;
+                font-weight: 800;
+                text-transform: uppercase;
+                color: #1a1a1a;
+              "
+            >
+              SCORE
             </div>
           </div>
         </div>
-        <div class="header-right">
-          <button class="btn-ghost" id="export-btn">
-            <i data-lucide="download"></i>
-            Export Report
-          </button>
-          <button class="btn-ghost icon-only" id="theme-toggle">
-            <i data-lucide="moon"></i>
-          </button>
-        </div>
-      </header>
 
-      <!-- Sidebar -->
-      <aside class="sidebar glass-effect">
-        <div class="sidebar-section">
-          <h3>WCAG Levels</h3>
-          <div class="filter-group">
-            <label><input type="checkbox" value="A" checked> Level A</label>
-            <label><input type="checkbox" value="AA" checked> Level AA</label>
-            <label><input type="checkbox" value="AAA"> Level AAA</label>
+        <!-- 2. Critical Card -->
+        <div class="sidebar-section" style="width: 100%">
+          <div
+            class="score-card critical-sidebar-card"
+            style="width: 100%; display: flex; align-items: center; gap: 20px"
+          >
+            <div
+              id="stat-critical"
+              style="
+                font-size: 1.8rem;
+                font-weight: 800;
+                color: var(--accent-primary);
+                font-family: &quot;Outfit&quot;;
+              "
+            >
+              0
+            </div>
+            <div
+              class="stat-label"
+              style="
+                font-size: 0.75rem;
+                font-weight: 800;
+                text-transform: uppercase;
+                color: #1a1a1a;
+                letter-spacing: 0.05em;
+              "
+            >
+              CRITICAL
+            </div>
           </div>
         </div>
-        <div class="sidebar-section">
-          <h3>Severity</h3>
-          <div class="filter-group">
-            <label><input type="checkbox" value="critical" checked> <span class="dot critical"></span> Critical</label>
-            <label><input type="checkbox" value="serious" checked> <span class="dot serious"></span> Serious</label>
-            <label><input type="checkbox" value="moderate" checked> <span class="dot moderate"></span> Moderate</label>
-            <label><input type="checkbox" value="minor" checked> <span class="dot minor"></span> Minor</label>
+
+        <!-- 3. WCAG Levels Card -->
+        <div class="sidebar-section" style="width: 100%">
+          <div
+            class="glass-card levels-card"
+            style="
+              width: 100%;
+              background: white;
+              padding: 24px;
+              border-radius: var(--border-radius-md);
+              box-shadow: var(--shadow-subtle);
+            "
+          >
+            <h3
+              style="
+                color: #1a1a1a;
+                font-size: 0.75rem;
+                font-weight: 800;
+                text-transform: uppercase;
+                margin-bottom: 20px;
+                letter-spacing: 0.05em;
+              "
+            >
+              WCAG LEVELS
+            </h3>
+            <div class="filter-group">
+              <label class="modern-checkbox"
+                ><input type="checkbox" value="A" checked />
+                <span style="color: #1a1a1a">Level A</span></label
+              >
+              <label class="modern-checkbox"
+                ><input type="checkbox" value="AA" checked />
+                <span style="color: #1a1a1a">Level AA</span></label
+              >
+              <label class="modern-checkbox"
+                ><input type="checkbox" value="AAA" />
+                <span style="color: #1a1a1a">Level AAA</span></label
+              >
+            </div>
           </div>
         </div>
-        <div class="sidebar-section">
-          <h3>Status</h3>
-          <div class="filter-group">
-            <label><input type="checkbox" value="fail" checked> Fail</label>
-            <label><input type="checkbox" value="review" checked> Needs Review</label>
-            <label><input type="checkbox" value="pass"> Pass</label>
-          </div>
+
+        <!-- 4. Chat Button -->
+        <div class="sidebar-section" style="width: 100%">
+          <button
+            class="btn-ghost"
+            id="toggle-chat-sidebar"
+            style="
+              width: 100%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 12px;
+              height: 56px;
+              background: white;
+              border-radius: var(--border-radius-md);
+              box-shadow: var(--shadow-subtle);
+              color: #1a1a1a;
+              font-weight: 800;
+              border: none;
+              padding: 0;
+            "
+          >
+            <i
+              data-lucide="message-square"
+              style="width: 20px; height: 20px"
+            ></i>
+            <span style="letter-spacing: 0.05em">ASSISTANT</span>
+          </button>
+        </div>
+
+        <!-- 5. Rules Button -->
+        <div class="sidebar-section" style="width: 100%">
+          <button
+            class="btn-ghost"
+            id="toggle-rules"
+            style="
+              width: 100%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 12px;
+              height: 56px;
+              background: white;
+              border-radius: var(--border-radius-md);
+              box-shadow: var(--shadow-subtle);
+              color: #1a1a1a;
+              font-weight: 800;
+              border: none;
+              padding: 0;
+            "
+          >
+            <i data-lucide="book-open" style="width: 20px; height: 20px"></i>
+            <span style="letter-spacing: 0.05em">RULES</span>
+          </button>
+        </div>
+
+        <div style="flex: 1"></div>
+
+        <!-- 6. Export Button -->
+        <div class="sidebar-section" style="margin-bottom: 20px; width: 100%">
+          <button
+            class="btn-ghost"
+            id="export-btn"
+            style="
+              width: 100%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 12px;
+              height: 56px;
+              background: white;
+              border-radius: var(--border-radius-md);
+              box-shadow: var(--shadow-subtle);
+              color: #1a1a1a;
+              font-weight: 800;
+              border: none;
+              padding: 0;
+            "
+          >
+            <i data-lucide="download" style="width: 20px; height: 20px"></i>
+            <span style="letter-spacing: 0.05em">EXPORT</span>
+          </button>
         </div>
       </aside>
+
+      <!-- Header -->
+      <header class="header">
+        <div
+          class="header-left"
+          style="display: flex; align-items: center; gap: 24px"
+        >
+          <h2 style="font-size: 1.4rem">
+            #<span style="color: var(--accent-primary)">WCAG Auditor</span>
+          </h2>
+          <div
+            id="active-url-display"
+            class="badge"
+            style="
+              background: white;
+              border: 1px solid #eee;
+              color: var(--text-muted);
+              font-size: 0.75rem;
+              max-width: 280px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            "
+          >
+            Loading...
+          </div>
+        </div>
+
+        <div class="header-center">
+          <div
+            class="header-action-group"
+            style="display: flex; gap: 12px; align-items: center"
+          >
+            <div class="search-box" style="width: 240px">
+              <input
+                type="text"
+                id="issue-search"
+                placeholder="Filter issues..."
+              />
+              <i data-lucide="search"></i>
+            </div>
+            <div
+              class="new-scan-inline"
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                background: white;
+                border-radius: var(--border-radius-pill);
+                padding: 4px 8px;
+                border: 1px solid var(--accent-primary);
+                box-shadow: var(--shadow-subtle);
+              "
+            >
+              <input
+                type="text"
+                id="inline-url"
+                placeholder="Enter new URL..."
+                style="
+                  border: none;
+                  outline: none;
+                  padding: 6px 12px;
+                  font-size: 0.8rem;
+                  width: 180px;
+                  font-family: inherit;
+                "
+              />
+              <button
+                id="inline-scan-btn"
+                style="
+                  background: var(--accent-primary);
+                  color: white;
+                  border: none;
+                  padding: 6px 16px;
+                  border-radius: var(--border-radius-pill);
+                  font-size: 0.8rem;
+                  font-weight: 700;
+                "
+              >
+                Scan
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <!-- Empty for now, or just remove the div -->
+        </div>
+      </header>
 
       <!-- Main Content (Issue List) -->
       <main class="main-content">
         <div class="content-header">
-          <h2>Detected Issues</h2>
-          <div class="search-box">
-            <i data-lucide="search"></i>
-            <input type="text" id="issue-search" placeholder="Search rules or elements..." />
+          <div class="view-tabs" style="display: flex; gap: 32px; align-items: baseline;">
+              <h2 id="tab-detected" class="view-tab active" style="cursor: pointer; transition: var(--transition); font-size: 1.8rem; font-weight: 800;">Detected Issues</h2>
+              <h2 id="tab-passed" class="view-tab" style="cursor: pointer; opacity: 0.3; transition: var(--transition); font-size: 1.4rem; font-weight: 700;">Passed Results</h2>
+          </div>
+          <div
+            class="filter-pills"
+            id="main-filters"
+            style="display: flex; gap: 10px"
+          >
+            <button class="pill active" data-filter="all">All Issues</button>
+            <button class="pill" data-filter="critical">Critical</button>
+            <button class="pill" data-filter="serious">Serious</button>
+            <button class="pill" data-filter="moderate">Moderate</button>
           </div>
         </div>
-        <div class="table-container glass-effect">
+        <div class="table-container">
           <table id="issue-table">
             <thead>
               <tr>
@@ -144,12 +357,30 @@
         </div>
       </main>
 
+      <!-- Rules Reference (Tab-like View) -->
+      <section id="rules-view" class="main-content hidden" style="padding: 40px; overflow-y: auto;">
+        <div class="content-header" style="margin-bottom: 40px;">
+           <h2 style="font-size: 2.2rem; font-weight: 800;">Auditing Rules Reference</h2>
+           <button class="btn-ghost" id="close-rules" style="padding: 12px 32px; font-weight: 800; border: 1px solid #ddd;">BACK TO AUDIT</button>
+        </div>
+        <div id="rules-content" style="background: white; padding: 60px; border-radius: 40px; box-shadow: var(--shadow-normal); font-size: 1.1rem; color: #333; line-height: 1.8;">
+            <!-- Rules from rules.md will be rendered here -->
+            <p>Loading rules...</p>
+        </div>
+      </section>
+
       <!-- Detail Panel (Initially empty/hidden) -->
-      <section id="detail-panel" class="detail-panel glass-effect hidden">
+      <section id="detail-panel" class="detail-panel hidden">
         <div class="panel-header">
-          <button class="close-panel"><i data-lucide="x"></i></button>
+          <div class="panel-header-top">
+            <div id="detail-badge" class="badge">CRITICAL</div>
+            <button id="copy-issue-btn" class="btn-ghost" title="Copy full issue report" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 700; border-radius: 6px; display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.03);">
+              <i data-lucide="copy" style="width: 14px; height: 14px;"></i>
+              Copy Result
+            </button>
+            <button class="close-panel"><i data-lucide="x"></i></button>
+          </div>
           <h3 id="detail-title">Issue Details</h3>
-          <div id="detail-badge" class="badge">CRITICAL</div>
         </div>
         <div class="panel-scroll-area">
           <div class="detail-section">
@@ -160,6 +391,19 @@
             <h4>Impact</h4>
             <p id="detail-impact">...</p>
           </div>
+          <div id="visual-evidence-section" class="detail-section hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h4 style="margin: 0;">Visual Evidence</h4>
+              <button id="copy-image-btn" class="btn-ghost" title="Copy screenshot only" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.03);">
+                <i data-lucide="image" style="width: 14px; height: 14px;"></i>
+                Copy Image
+              </button>
+            </div>
+            <div style="background: #f8f9fa; padding: 16px; border-radius: var(--border-radius-md); border: 1px solid #eee; text-align: center; position: relative;">
+              <img id="detail-image" src="" alt="Violation screenshot" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+            </div>
+          </div>
+
           <div class="detail-section">
             <h4>Affected Element</h4>
             <div class="code-block glass-effect">
@@ -189,7 +433,9 @@
         <div class="chat-header">
           <i data-lucide="message-square"></i>
           <span>Accessibility Assistant</span>
-          <button class="minimize-chat"><i data-lucide="chevron-down"></i></button>
+          <button class="minimize-chat">
+            <i data-lucide="chevron-down"></i>
+          </button>
         </div>
         <div id="chat-messages" class="chat-messages">
           <div class="message ai-message">
@@ -197,7 +443,11 @@
           </div>
         </div>
         <div class="chat-input-area">
-          <input type="text" id="chat-input" placeholder="Ask about a rule or fix..." />
+          <input
+            type="text"
+            id="chat-input"
+            placeholder="Ask about a rule or fix..."
+          />
           <button id="send-chat-btn"><i data-lucide="send"></i></button>
         </div>
       </div>

@@ -1,5 +1,25 @@
 /* --- Global Note: 'io' is provided by the CDN script in index.html --- */
 
+// Vanta Initialization
+if (typeof VANTA !== 'undefined') {
+  VANTA.DOTS({
+    el: "#vanta-bg",
+    mouseControls: true,
+    touchControls: true,
+    gyroControls: false,
+    minHeight: 200.00,
+    minWidth: 200.00,
+    scale: 1.00,
+    scaleMobile: 1.00,
+    color: 0xff260f,
+    color2: 0xff8820,
+    backgroundColor: 0xf9f9f9,
+    size: 6.00,
+    spacing: 49.00,
+    showLines: false
+  });
+}
+
 // --- State Management ---
 const state = {
   url: "",
@@ -8,7 +28,7 @@ const state = {
   filters: {
     level: ["A", "AA"],
     severity: ["critical", "serious", "moderate", "minor"],
-    status: ["fail", "review", "fixed"]
+    status: ["fail", "review", "fixed", "pass"]
   },
   isScanning: false
 };
@@ -94,17 +114,16 @@ function renderDashboard() {
   if (!state.results) return;
   
   // Update URL and Score
-  document.getElementById('display-url').innerText = state.url;
+  const urlDisplay = document.getElementById('active-url-display');
+  if (urlDisplay) urlDisplay.innerText = state.url.replace(/^https?:\/\//, '');
+  
   const score = state.results.score || 0;
   document.getElementById('score-value').textContent = Math.round(score);
   document.getElementById('score-path').style.strokeDasharray = `${score}, 100`;
   
   // Update Stats
-  document.getElementById('stat-total-issues').innerText = state.results.issues.length;
   const criticalCount = state.results.issues.filter(i => i.severity === 'critical' && i.status !== 'fixed').length;
   document.getElementById('stat-critical').innerText = criticalCount;
-  const fixedCount = state.results.issues.filter(i => i.status === 'fixed').length;
-  document.getElementById('stat-fixed').innerText = fixedCount;
 
   renderIssueList();
 }
@@ -117,15 +136,36 @@ function renderIssueList() {
            issue.status !== 'ignored';
   });
 
-  issueTableBody.innerHTML = filteredIssues.map(issue => `
+  issueTableBody.innerHTML = filteredIssues.map(issue => {
+    // Map severity to an icon
+    let icon = 'alert-circle';
+    if (issue.severity === 'critical') icon = 'zap';
+    if (issue.severity === 'serious') icon = 'alert-triangle';
+    if (issue.severity === 'moderate') icon = 'info';
+    if (issue.status === 'pass') icon = 'check-circle';
+    
+    return `
     <tr data-id="${issue.rule_id}" class="${issue.status === 'fixed' ? 'row-fixed' : ''}">
-      <td><span class="badge-rule">${issue.rule_id}</span></td>
+      <td>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="severity-icon severity-${issue.severity}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                <i data-lucide="${icon}" style="width: 16px; height: 16px;"></i>
+            </div>
+            <span class="badge-rule">${issue.rule_id}</span>
+        </div>
+      </td>
       <td class="guideline-title">${issue.title}</td>
       <td><span class="status-indicator status-${issue.status}">${issue.status}</span></td>
       <td><span class="badge badge-${issue.severity}">${issue.severity}</span></td>
-      <td>${issue.elements.length}</td>
+      <td style="font-weight: 700;">${issue.elements.length} elements</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
+
+  // Re-initialize icons for the newly added rows
+  if (window.lucide) {
+      lucide.createIcons();
+  }
 
   // Add event listeners to rows
   issueTableBody.querySelectorAll('tr').forEach(row => {
@@ -148,7 +188,20 @@ function showIssueDetails(issue) {
   
   const badge = document.getElementById('detail-badge');
   badge.className = `badge badge-${issue.severity}`;
-  badge.innerText = issue.severity;
+  badge.innerText = issue.severity.toUpperCase();
+
+  // Visual Evidence Screenshot
+  const evidenceSection = document.getElementById('visual-evidence-section');
+  const detailImg = document.getElementById('detail-image');
+  const screenshot = issue.elements[0]?.screenshot;
+  
+  if (screenshot) {
+      detailImg.src = `data:image/png;base64,${screenshot}`;
+      evidenceSection.classList.remove('hidden');
+  } else {
+      detailImg.src = "";
+      evidenceSection.classList.add('hidden');
+  }
 
   detailPanel.classList.remove('hidden');
   
@@ -158,6 +211,105 @@ function showIssueDetails(issue) {
     text: `Provide a detailed explanation and fix for ${issue.rule_id}`,
     context: { issue, domSummary: "..." }
   });
+}
+
+// --- Copy Report Feature ---
+const copyBtn = document.getElementById('copy-issue-btn');
+if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+        const issue = state.activeIssue;
+        if (!issue) return;
+
+        const reportText = `
+ACCESSIBILITY AUDIT REPORT
+--------------------------
+ID: ${issue.rule_id}
+Title: ${issue.title}
+Severity: ${issue.severity.toUpperCase()}
+Description: ${issue.description}
+Impact: ${issue.why_matters || 'Affects accessibility compliance.'}
+
+Affected Element:
+${issue.elements[0]?.html || 'N/A'}
+
+AI Fix Suggestion:
+${(issue.ai_suggestion || '').replace(/<[^>]*>/g, '')}
+        `.trim();
+
+        try {
+            const clipboardItems = {
+                "text/plain": new Blob([reportText], { type: "text/plain" })
+            };
+
+            // Attempt to copy image if present
+            if (issue.elements[0]?.screenshot) {
+                try {
+                    const resp = await fetch(`data:image/png;base64,${issue.elements[0].screenshot}`);
+                    const blob = await resp.blob();
+                    clipboardItems["image/png"] = blob;
+                } catch (imgErr) {
+                    console.warn("Could not process image for clipboard:", imgErr);
+                }
+            }
+
+            // Using the modern Clipboard API
+            await navigator.clipboard.write([
+                new ClipboardItem(clipboardItems)
+            ]);
+            
+            // Visual Feedback
+            const originalContent = copyBtn.innerHTML;
+            copyBtn.innerHTML = `<i data-lucide="check" style="width: 14px; height: 14px; color: #10b981;"></i> Copied!`;
+            if (window.lucide) lucide.createIcons();
+            
+            setTimeout(() => {
+                copyBtn.innerHTML = originalContent;
+                if (window.lucide) lucide.createIcons();
+            }, 2000);
+
+        } catch (err) {
+            console.error("Clipboard Error:", err);
+            // Fallback for simple text if multi-item fails
+            try {
+                await navigator.clipboard.writeText(reportText);
+                alert("Copied text report (Image copy not supported by this browser).");
+            } catch (fail) {
+                alert("Failed to copy to clipboard.");
+            }
+        }
+    });
+}
+
+// --- Copy Image Only Feature ---
+const copyImgBtn = document.getElementById('copy-image-btn');
+if (copyImgBtn) {
+    copyImgBtn.addEventListener('click', async () => {
+        const issue = state.activeIssue;
+        const screenshot = issue?.elements[0]?.screenshot;
+        if (!screenshot) return;
+
+        try {
+            const resp = await fetch(`data:image/png;base64,${screenshot}`);
+            const blob = await resp.blob();
+            
+            await navigator.clipboard.write([
+                new ClipboardItem({ "image/png": blob })
+            ]);
+            
+            const originalContent = copyImgBtn.innerHTML;
+            copyImgBtn.innerHTML = `<i data-lucide="check" style="width: 14px; height: 14px; color: #10b981;"></i> Image Copied!`;
+            if (window.lucide) lucide.createIcons();
+            
+            setTimeout(() => {
+                copyImgBtn.innerHTML = originalContent;
+                if (window.lucide) lucide.createIcons();
+            }, 2000);
+
+        } catch (err) {
+            console.error("Image Copy Error:", err);
+            alert("Failed to copy image to clipboard.");
+        }
+    });
 }
 
 function addChatMessage(text, sender) {
@@ -170,8 +322,7 @@ function addChatMessage(text, sender) {
 
 // --- Event Listeners ---
 
-startBtn.addEventListener('click', () => {
-  const url = urlInput.value.trim();
+function handleStartScan(url) {
   if (!url) return alert("Please enter a valid URL");
   
   if (!socket.connected) {
@@ -186,6 +337,10 @@ startBtn.addEventListener('click', () => {
   loadingStatus.innerText = "Initializing...";
   loadingProgress.innerText = "Waiting for backend response...";
   
+  // Update active URL display
+  const urlDisplay = document.getElementById('active-url-display');
+  if (urlDisplay) urlDisplay.innerText = url;
+
   console.log(`📤 EMITTING start-scan for: ${url}`);
   socket.emit('start-scan', {
     url: url,
@@ -193,6 +348,16 @@ startBtn.addEventListener('click', () => {
       aiAssisted: document.getElementById('ai-assisted').checked
     }
   });
+}
+
+startBtn.addEventListener('click', () => {
+  handleStartScan(urlInput.value.trim());
+});
+
+document.getElementById('inline-scan-btn')?.addEventListener('click', () => {
+    const inlineInput = document.getElementById('inline-url');
+    handleStartScan(inlineInput.value.trim());
+    inlineInput.value = '';
 });
 
 sendChatBtn.addEventListener('click', () => {
@@ -236,27 +401,120 @@ document.querySelector('.close-panel')?.addEventListener('click', () => {
   state.activeIssue = null;
 });
 
+
+// Chat UI interactions (Three View Mode)
+document.getElementById('toggle-chat-sidebar')?.addEventListener('click', () => {
+    appShell.classList.toggle('chat-open');
+});
+
 document.querySelector('.minimize-chat')?.addEventListener('click', () => {
-  chatContainer.classList.toggle('minimized');
+    appShell.classList.remove('chat-open');
 });
 
 // Sidebar filters
 document.querySelectorAll('.sidebar input[type="checkbox"]').forEach(checkbox => {
   checkbox.addEventListener('change', () => {
-    const type = checkbox.parentNode.parentNode.previousElementSibling.innerText.toLowerCase();
+    const parent = checkbox.closest('.sidebar-section');
+    const type = parent ? parent.querySelector('h3').innerText.toLowerCase() : '';
     const val = checkbox.value;
     
     if (type.includes('level')) {
       if (checkbox.checked) state.filters.level.push(val);
       else state.filters.level = state.filters.level.filter(v => v !== val);
-    } else if (type.includes('severity')) {
-      if (checkbox.checked) state.filters.severity.push(val);
-      else state.filters.severity = state.filters.severity.filter(v => v !== val);
-    } else if (type.includes('status')) {
-      if (checkbox.checked) state.filters.status.push(val);
-      else state.filters.status = state.filters.status.filter(v => v !== val);
-    }
+    } 
     
     renderIssueList();
   });
+});
+
+// Main Content Pill Filters
+document.querySelectorAll('.pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+        document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        
+        const filter = pill.getAttribute('data-filter');
+        
+        // Reset all filtering for severity and status before applying specific pill logic
+        state.filters.severity = ["critical", "serious", "moderate", "minor"];
+        state.filters.status = ["fail", "review", "fixed"];
+
+        if (filter === 'critical' || filter === 'serious' || filter === 'moderate') {
+            state.filters.severity = [filter];
+            state.filters.status = ["fail", "review"];
+        }
+        
+        renderIssueList();
+    });
+});
+
+// View Tabs (Detected/Passed)
+const tabDetected = document.getElementById('tab-detected');
+const tabPassed = document.getElementById('tab-passed');
+const mainFilters = document.getElementById('main-filters');
+
+tabDetected?.addEventListener('click', () => {
+    tabDetected.classList.add('active');
+    tabPassed.classList.remove('active');
+    mainFilters.classList.remove('hidden');
+    
+    state.filters.status = ["fail", "review", "fixed"];
+    renderIssueList();
+});
+
+tabPassed?.addEventListener('click', () => {
+    tabPassed.classList.add('active');
+    tabDetected.classList.remove('active');
+    mainFilters.classList.add('hidden');
+    
+    state.filters.status = ["pass"];
+    renderIssueList();
+});
+
+// Rules View Logic
+const rulesBtn = document.getElementById('toggle-rules');
+const rulesView = document.getElementById('rules-view');
+const mainArea = document.querySelector('main.main-content');
+const closeRulesBtn = document.getElementById('close-rules');
+const rulesContent = document.getElementById('rules-content');
+
+rulesBtn?.addEventListener('click', async () => {
+    // Hide main results, show rules
+    mainArea.classList.add('hidden');
+    rulesView.classList.remove('hidden');
+    
+    // Fetch and simple render of rules.md
+    try {
+        const response = await fetch('/rules.md');
+        if (!response.ok) throw new Error("Could not load rules.md");
+        let text = await response.text();
+        
+        // Basic Markdown-ish formatting
+        text = text
+            .replace(/^# (.*$)/gm, '<h1 style="font-size: 2.2rem; margin-bottom: 24px;">$1</h1>')
+            .replace(/^## (.*$)/gm, '<h2 style="font-size: 1.8rem; margin-top: 40px; margin-bottom: 16px; color: var(--accent-primary);">$1</h2>')
+            .replace(/^### (.*$)/gm, '<h3 style="font-size: 1.2rem; margin-top: 24px; margin-bottom: 12px; color: #1a1a1a;">$1</h3>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/^\* (.*$)/gm, '<li style="margin-left: 20px;">$1</li>')
+            .replace(/\n/g, '<br/>');
+
+        rulesContent.innerHTML = text;
+    } catch (e) {
+        rulesContent.innerText = "Error loading rules: " + e.message;
+    }
+});
+
+closeRulesBtn?.addEventListener('click', () => {
+    rulesView.classList.add('hidden');
+    mainArea.classList.remove('hidden');
+});
+
+// Search functionality
+document.getElementById('issue-search')?.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase();
+    const rows = issueTableBody.querySelectorAll('tr');
+    rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(query) ? '' : 'none';
+    });
 });
