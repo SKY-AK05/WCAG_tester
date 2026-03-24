@@ -118,12 +118,14 @@ async function runScan(targetUrl, socket, options) {
       return await axe.run();
     });
     
-    socket.emit('scan-progress', { status: 'Processing', progress: 70, details: 'Mapping violations to WCAG 2.2...' });
+    socket.emit('scan-progress', { status: 'Processing', progress: 70, details: 'Mapping violations and passed rules to WCAG 2.2...' });
     
     // Process results and capture screenshots
     socket.emit('scan-progress', { status: 'Capturing Evidence', progress: 70, details: 'Taking visual snippets of violations...' });
     
     const processedIssues = [];
+    
+    // Process violations (failed rules)
     for (const v of axeResults.violations) {
       const elements = [];
       
@@ -166,6 +168,38 @@ async function runScan(targetUrl, socket, options) {
         ai_suggestion: "Pending AI Review..."
       });
     }
+    
+    // Process passes (passed rules)
+    if (axeResults.passes && axeResults.passes.length > 0) {
+      for (const p of axeResults.passes) {
+        const elements = [];
+        
+        for (let i = 0; i < Math.min(p.nodes.length, 3); i++) {
+          const n = p.nodes[i];
+          const selector = n.target.join(' > ');
+          
+          elements.push({
+            html: n.html,
+            selector: selector,
+            summary: "This element passes the accessibility check",
+            screenshot: null
+          });
+        }
+
+        processedIssues.push({
+          rule_id: p.id,
+          title: p.help,
+          description: p.description,
+          status: 'pass',
+          severity: 'minor',
+          level: mapToWCAGLevel(p.id), 
+          category: 'Perceivable',
+          elements: elements,
+          why_matters: "This accessibility rule has been successfully implemented.",
+          ai_suggestion: "No action needed - this rule is properly implemented."
+        });
+      }
+    }
 
     if (options.aiAssisted && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'YOUR_GEMINI_API_KEY_HERE') {
       socket.emit('scan-progress', { status: 'AI Reviewing', progress: 85, details: 'Performing semantic and UX analysis on key issues...' });
@@ -189,7 +223,7 @@ async function runScan(targetUrl, socket, options) {
       timestamp: new Date().toISOString()
     };
 
-    console.log(`[SCAN] Complete! Detected ${processedIssues.length} violations at score ${finalReport.score}`);
+    console.log(`[SCAN] Complete! Detected ${processedIssues.filter(i => i.status === 'fail').length} violations and ${processedIssues.filter(i => i.status === 'pass').length} passed rules at score ${finalReport.score}`);
     socket.emit('scan-complete', finalReport);
     
   } catch (error) {

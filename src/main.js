@@ -28,7 +28,7 @@ const state = {
   filters: {
     level: ["A", "AA"],
     severity: ["critical", "serious", "moderate", "minor"],
-    status: ["fail", "review", "fixed", "pass"]
+    status: ["fail", "review", "fixed"]
   },
   isScanning: false
 };
@@ -129,12 +129,39 @@ function renderDashboard() {
 }
 
 function renderIssueList() {
+  console.log("All issues from server:", state.results.issues);
+  console.log("Current filters:", state.filters);
+  
   const filteredIssues = state.results.issues.filter(issue => {
     return state.filters.level.includes(issue.level) &&
            state.filters.severity.includes(issue.severity) &&
            state.filters.status.includes(issue.status) &&
            issue.status !== 'ignored';
   });
+  
+  console.log("Filtered issues:", filteredIssues);
+
+  // Check if we're showing passed results
+  const isShowingPassed = state.filters.status.length === 1 && state.filters.status[0] === 'pass';
+  
+  // Update table headers based on view
+  const tableHeaders = document.querySelector('#issue-table thead tr');
+  if (isShowingPassed) {
+    tableHeaders.innerHTML = `
+      <th>Rule ID</th>
+      <th>Guideline Title</th>
+      <th>Status</th>
+      <th>Elements Checked</th>
+    `;
+  } else {
+    tableHeaders.innerHTML = `
+      <th>Rule ID</th>
+      <th>Guideline Title</th>
+      <th>Status</th>
+      <th>Severity</th>
+      <th>Elements</th>
+    `;
+  }
 
   issueTableBody.innerHTML = filteredIssues.map(issue => {
     // Map severity to an icon
@@ -156,8 +183,11 @@ function renderIssueList() {
       </td>
       <td class="guideline-title">${issue.title}</td>
       <td><span class="status-indicator status-${issue.status}">${issue.status}</span></td>
-      <td><span class="badge badge-${issue.severity}">${issue.severity}</span></td>
-      <td style="font-weight: 700;">${issue.elements.length} elements</td>
+      ${isShowingPassed ? 
+        `<td style="font-weight: 700;">${issue.elements.length} elements</td>` :
+        `<td><span class="badge badge-${issue.severity}">${issue.severity}</span></td>
+         <td style="font-weight: 700;">${issue.elements.length} elements</td>`
+      }
     </tr>
   `;
   }).join('');
