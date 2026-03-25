@@ -30,9 +30,22 @@
           </button>
         </div>
 
-        <div class="scan-options" style="display: flex; align-items: center; gap: 12px; margin-top: 24px;">
-          <input type="checkbox" id="ai-assisted" style="width: 20px; height: 20px;" checked />
-          <label for="ai-assisted" style="font-weight: 600; font-size: 0.95rem; opacity: 0.7;">Enable AI-Assisted Semantic Review (Slower, but deeper)</label>
+        <div class="scan-options" style="display: flex; flex-direction: column; gap: 12px; margin-top: 24px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <input type="checkbox" id="ai-assisted" style="width: 20px; height: 20px;" checked />
+            <label for="ai-assisted" style="font-weight: 600; font-size: 0.95rem; opacity: 0.7;">Enable AI-Assisted Semantic Review (Slower, but deeper)</label>
+          </div>
+          
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <input type="checkbox" id="enable-auth" style="width: 20px; height: 20px;" />
+            <label for="enable-auth" style="font-weight: 600; font-size: 0.95rem; opacity: 0.7;">Enable Authentication (Login Required)</label>
+          </div>
+          
+          <div id="auth-credentials" style="display: none; flex-direction: column; gap: 12px; padding: 16px; background: rgba(255, 255, 255, 0.1); border-radius: 12px;">
+            <input type="email" id="auth-username" placeholder="Email/Username" style="padding: 8px 12px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; background: rgba(255,255,255,0.9); color: #333; font-size: 0.9rem;" />
+            <input type="password" id="auth-password" placeholder="Password" style="padding: 8px 12px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; background: rgba(255,255,255,0.9); color: #333; font-size: 0.9rem;" />
+            <small style="opacity: 0.6; font-size: 0.8rem;">Credentials are only used during the scan session</small>
+          </div>
         </div>
       </div>
     </main>
@@ -391,6 +404,12 @@
             <h4>Impact</h4>
             <p id="detail-impact">...</p>
           </div>
+          <div class="detail-section">
+            <h4>WCAG 2.2 Reference</h4>
+            <div id="detail-wcag-links" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
           <div id="visual-evidence-section" class="detail-section hidden">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
               <h4 style="margin: 0;">Visual Evidence</h4>
@@ -414,11 +433,25 @@
           </div>
           <div class="detail-section">
             <h4>AI Fix Suggestion</h4>
-            <div class="ai-suggestion-box glass-effect">
-              <div class="ai-header">
-                <i data-lucide="sparkles"></i> AI Recommends
+            <div id="ai-fix-container">
+              <button id="get-ai-fix-btn" class="btn-primary" style="
+                display: flex; align-items: center; gap: 10px;
+                padding: 12px 24px; font-size: 0.9rem; font-weight: 700;
+                border-radius: var(--border-radius-pill);
+                background: linear-gradient(135deg, #6c5ce7, #a855f7);
+                color: white; border: none; cursor: pointer;
+                box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);
+                transition: all 0.3s ease;
+              ">
+                <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
+                Get AI Fix Suggestion
+              </button>
+              <div id="ai-fix-result" class="ai-suggestion-box glass-effect hidden" style="margin-top: 16px;">
+                <div class="ai-header">
+                  <i data-lucide="sparkles"></i> AI Recommends
+                </div>
+                <div id="detail-ai-fix">...</div>
               </div>
-              <div id="detail-ai-fix">...</div>
             </div>
           </div>
         </div>

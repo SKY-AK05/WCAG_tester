@@ -822,3 +822,70 @@ tr:hover td {
 ::-webkit-scrollbar-thumb:hover {
   background: #d0d0d0;
 }
+
+/* AI Fix Button */
+#get-ai-fix-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(108, 92, 231, 0.4);
+}
+
+#get-ai-fix-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+/* WCAG Link Badges (in issue table) */
+.wcag-link-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--border-radius-pill);
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #f0f4ff;
+  color: #3b5bdb;
+  text-decoration: none;
+  border: 1px solid #dbe4ff;
+  transition: var(--transition);
+  letter-spacing: 0.02em;
+}
+
+.wcag-link-badge:hover {
+  background: #3b5bdb;
+  color: white;
+  border-color: #3b5bdb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 91, 219, 0.25);
+}
+
+/* WCAG Reference Links (in detail panel) */
+.wcag-ref-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--border-radius-sm);
+  background: #f0f4ff;
+  color: #3b5bdb;
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid #dbe4ff;
+  transition: var(--transition);
+}
+
+.wcag-ref-link:hover {
+  background: #3b5bdb;
+  color: white;
+  border-color: #3b5bdb;
+  transform: translateX(4px);
+  box-shadow: 0 4px 15px rgba(59, 91, 219, 0.2);
+}
+
+.wcag-ref-link:hover i {
+  color: white;
+}

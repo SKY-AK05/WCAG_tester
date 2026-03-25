@@ -1,0 +1,32 @@
+{
+  "name": "wcag-auth-auditor",
+  "version": "1.0.0",
+  "description": "Modular WCAG 2.2 auditing system with authentication support",
+  "main": "example.js",
+  "type": "module",
+  "scripts": {
+    "start": "node example.js",
+    "test": "node test/test.js",
+    "dev": "node --watch example.js"
+  },
+  "keywords": [
+    "wcag",
+    "accessibility",
+    "audit",
+    "authentication",
+    "playwright",
+    "axe-core"
+  ],
+  "author": "WCAG Auditor Team",
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.40.0",
+    "axe-core": "^4.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

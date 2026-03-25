@@ -8,6 +8,7 @@ import { chromium } from 'playwright';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { fileURLToPath } from 'url';
 import path from 'path';
+import AuthIntegration from './authIntegration.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,9 @@ const io = new Server(httpServer, {
 });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "AI_KEY_NOT_FOUND");
+
+// Initialize Auth Integration
+const authIntegration = new AuthIntegration();
 
 // --- Scan Service ---
 
@@ -75,12 +79,29 @@ async function getAIReview(issue, contextData) {
   }
 }
 
-// --- Modified runScan ---
+// --- Enhanced runScan with Authentication Support ---
 
-async function runScan(targetUrl, socket, options) {
-  let browser;
+async function runScan(targetUrl, socket, options = {}) {
+  let browser = null; // Declare browser at function level
   try {
     console.log(`Starting scan for: ${targetUrl}`);
+    
+    // Check if authentication is enabled
+    if (options.enableAuth && options.credentials) {
+      console.log('🔐 Using authenticated scan flow');
+      socket.emit('scan-progress', { status: 'Initializing Authenticated Scan', progress: 5, details: 'Preparing authentication flow...' });
+      
+      const authResults = await authIntegration.runAuthenticatedScan(targetUrl, options);
+      
+      if (authResults) {
+        console.log('✅ Authenticated scan completed');
+        socket.emit('scan-complete', authResults);
+        return;
+      }
+    }
+    
+    // Fall back to standard scan
+    console.log('📄 Using standard scan flow');
     socket.emit('scan-progress', { status: 'Launching Browser', progress: 10, details: 'Launching Chromium...' });
     
     browser = await chromium.launch({ 
@@ -164,6 +185,8 @@ async function runScan(targetUrl, socket, options) {
         level: mapToWCAGLevel(v.id), 
         category: 'Perceivable',
         elements: elements,
+        helpUrl: v.helpUrl || null,
+        wcagTags: extractWcagTags(v.tags || []),
         why_matters: "Accessibility violations impact users with disabilities and can lead to legal non-compliance.",
         ai_suggestion: "Pending AI Review..."
       });
@@ -195,25 +218,18 @@ async function runScan(targetUrl, socket, options) {
           level: mapToWCAGLevel(p.id), 
           category: 'Perceivable',
           elements: elements,
+          helpUrl: p.helpUrl || null,
+          wcagTags: extractWcagTags(p.tags || []),
           why_matters: "This accessibility rule has been successfully implemented.",
           ai_suggestion: "No action needed - this rule is properly implemented."
         });
       }
     }
 
-    if (options.aiAssisted && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'YOUR_GEMINI_API_KEY_HERE') {
-      socket.emit('scan-progress', { status: 'AI Reviewing', progress: 85, details: 'Performing semantic and UX analysis on key issues...' });
-      
-      // Analyze top 3 critical/serious issues
-      const topIssues = processedIssues.slice(0, 3);
-      for (let issue of topIssues) {
-        issue.ai_suggestion = await getAIReview(issue, {});
-      }
-    } else {
-      processedIssues.forEach(i => {
-        i.ai_suggestion = "Provide semantic structural elements and alternative text for all non-text content to ensure compliance.";
-      });
-    }
+    // AI suggestions are now on-demand (triggered by user clicking 'Get AI Fix' button)
+    processedIssues.forEach(i => {
+      i.ai_suggestion = null; // Will be populated on-demand
+    });
 
     const finalReport = {
       url: targetUrl,
@@ -254,6 +270,89 @@ function calculateScore(issues) {
     return acc + (p * Math.min(i.elements.length, 5));
   }, 0);
   return Math.max(0, 100 - penalty);
+}
+
+/**
+ * Extract WCAG success criteria from axe-core tags and generate official URLs.
+ * axe-core tags look like: ['wcag2a', 'wcag111', 'cat.text-alternatives']
+ * 'wcag111' = WCAG SC 1.1.1, 'wcag143' = WCAG SC 1.4.3, etc.
+ */
+function extractWcagTags(tags) {
+  // Map WCAG SC numbers to their URL slugs on w3.org
+  const scToSlug = {
+    '111': 'non-text-content',
+    '121': 'audio-only-and-video-only-prerecorded',
+    '122': 'captions-prerecorded',
+    '123': 'audio-description-or-media-alternative-prerecorded',
+    '131': 'info-and-relationships',
+    '132': 'meaningful-sequence',
+    '133': 'sensory-characteristics',
+    '141': 'use-of-color',
+    '142': 'audio-control',
+    '143': 'contrast-minimum',
+    '144': 'resize-text',
+    '145': 'images-of-text',
+    '146': 'contrast-enhanced',
+    '211': 'keyboard',
+    '212': 'no-keyboard-trap',
+    '214': 'character-key-shortcuts',
+    '221': 'timing-adjustable',
+    '222': 'pause-stop-hide',
+    '231': 'three-flashes-or-below-threshold',
+    '241': 'bypass-blocks',
+    '242': 'page-titled',
+    '243': 'focus-order',
+    '244': 'link-purpose-in-context',
+    '245': 'multiple-ways',
+    '246': 'headings-and-labels',
+    '247': 'focus-visible',
+    '251': 'pointer-gestures',
+    '252': 'pointer-cancellation',
+    '253': 'label-in-name',
+    '254': 'motion-actuation',
+    '255': 'target-size-minimum',
+    '256': 'dragging-movements',
+    '257': 'target-size-minimum',
+    '311': 'language-of-page',
+    '312': 'language-of-parts',
+    '321': 'on-focus',
+    '322': 'on-input',
+    '323': 'consistent-navigation',
+    '324': 'consistent-identification',
+    '331': 'error-identification',
+    '332': 'labels-or-instructions',
+    '333': 'error-suggestion',
+    '411': 'parsing',
+    '412': 'name-role-value',
+    '413': 'status-messages',
+  };
+
+  const results = [];
+  
+  for (const tag of tags) {
+    // Match tags like 'wcag111', 'wcag143', 'wcag2a', 'wcag21a', etc.
+    const scMatch = tag.match(/^wcag(\d{3,4})$/);
+    if (scMatch) {
+      const scNum = scMatch[1];
+      // Format: '111' → '1.1.1', '143' → '1.4.3'
+      const formatted = scNum.length === 3 
+        ? `${scNum[0]}.${scNum[1]}.${scNum[2]}`
+        : `${scNum[0]}.${scNum[1]}.${scNum[2]}${scNum[3]}`;
+      
+      const slug = scToSlug[scNum.substring(0, 3)] || null;
+      const url = slug 
+        ? `https://www.w3.org/WAI/WCAG22/Understanding/${slug}.html`
+        : `https://www.w3.org/WAI/WCAG22/quickref/#${formatted.replace(/\./g, '')}`;
+      
+      results.push({
+        criterion: formatted,
+        label: `WCAG ${formatted}`,
+        url: url
+      });
+    }
+  }
+
+  return results;
 }
 
 // --- Socket.io Events ---
@@ -315,6 +414,18 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log(`[SOCKET] User disconnected: ${socket.id}`);
+  });
+
+  // On-demand AI fix for a specific issue
+  socket.on('get-ai-fix', async (data) => {
+    console.log(`[AI-FIX] Requested for: ${data.issue?.rule_id}`);
+    
+    if (!data.issue) {
+      return socket.emit('ai-fix-response', { suggestion: 'No issue data provided.' });
+    }
+
+    const suggestion = await getAIReview(data.issue, data.context || {});
+    socket.emit('ai-fix-response', { suggestion });
   });
 });
 

@@ -1,0 +1,291 @@
+{
+  "url": "https://lettersmith.ai.umich.edu/dashboard",
+  "timestamp": "2024-03-24T15:56:00.000Z",
+  "phases": {
+    "detection": {
+      "requiresAuth": true,
+      "hasPasswordField": true,
+      "hasLoginKeywords": true,
+      "hasLogoutElement": false,
+      "loginFormFound": {
+        "form": "form",
+        "usernameField": {
+          "selector": "input[name='email']",
+          "type": "email",
+          "name": "email",
+          "id": "",
+          "placeholder": "Email address",
+          "autocomplete": ""
+        },
+        "passwordField": {
+          "selector": "input[name='password']",
+          "type": "password",
+          "name": "password",
+          "id": "",
+          "placeholder": "Password",
+          "autocomplete": ""
+        },
+        "submitButton": {
+          "selector": "button[type='submit']",
+          "type": "button",
+          "text": "Sign In"
+        }
+      }
+    },
+    "loginAudit": {
+      "success": true,
+      "url": "https://lettersmith.ai.umich.edu/login",
+      "auditType": "auth",
+      "timestamp": "2024-03-24T15:56:05.000Z",
+      "results": {
+        "violations": [
+          {
+            "type": "auth",
+            "rule": "auth-autocomplete-email",
+            "severity": "medium",
+            "element": "<input name=\"email\" type=\"email\" placeholder=\"Email address\">",
+            "message": "Email field should have autocomplete=\"email\" or autocomplete=\"username\"",
+            "selector": "input[name='email']",
+            "help": "Use autocomplete=\"email\" or autocomplete=\"username\" for email fields"
+          },
+          {
+            "type": "auth",
+            "rule": "auth-autocomplete-password",
+            "severity": "medium",
+            "element": "<input name=\"password\" type=\"password\" placeholder=\"Password\">",
+            "message": "Password field should have autocomplete=\"current-password\"",
+            "selector": "input[name='password']",
+            "help": "Use autocomplete=\"current-password\" for password fields"
+          },
+          {
+            "type": "auth",
+            "rule": "auth-placeholder-only",
+            "severity": "medium",
+            "element": "<input name=\"email\" type=\"email\" placeholder=\"Email address\">",
+            "message": "Input field should not rely solely on placeholder text for identification",
+            "selector": "input[name='email']",
+            "help": "Add a persistent label element in addition to or instead of placeholder text"
+          }
+        ],
+        "passes": [
+          {
+            "type": "auth",
+            "rule": "auth-input-label",
+            "element": "<input name=\"email\" type=\"email\" placeholder=\"Email address\">",
+            "message": "Input fields must have associated labels",
+            "selector": "input[name='email']",
+            "help": "Associate labels with input elements using label, aria-label, or aria-labelledby"
+          },
+          {
+            "type": "auth",
+            "rule": "auth-submit-button-label",
+            "element": "<button type=\"submit\">Sign In</button>",
+            "message": "Submit button must have accessible text",
+            "selector": "button[type='submit']",
+            "help": "Provide accessible text for submit buttons"
+          }
+        ],
+        "score": 88,
+        "summary": {
+          "total": 5,
+          "violations": 3,
+          "passes": 2,
+          "critical": 0,
+          "serious": 3,
+          "moderate": 0
+        }
+      }
+    },
+    "authentication": {
+      "success": true,
+      "method": "form",
+      "session": [
+        {
+          "name": "session_token",
+          "value": "abc123...",
+          "domain": ".umich.edu"
+        }
+      ],
+      "postLoginUrl": "https://lettersmith.ai.umich.edu/dashboard"
+    },
+    "navigation": {
+      "success": true,
+      "finalUrl": "https://lettersmith.ai.umich.edu/dashboard/collections/264"
+    },
+    "targetAudit": {
+      "success": true,
+      "url": "https://lettersmith.ai.umich.edu/dashboard/collections/264",
+      "auditType": "page",
+      "timestamp": "2024-03-24T15:56:10.000Z",
+      "results": {
+        "violations": [
+          {
+            "type": "page",
+            "rule": "color-contrast",
+            "severity": "medium",
+            "element": "<button class=\"secondary-btn\">Edit</button>",
+            "message": "Elements must have sufficient color contrast",
+            "selector": ".secondary-btn",
+            "help": "Increase color contrast ratio to meet WCAG AA standards",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.7/color-contrast"
+          },
+          {
+            "type": "page",
+            "rule": "button-name",
+            "severity": "low",
+            "element": "<button class=\"icon-btn\"><i class=\"icon-more\"></i></button>",
+            "message": "Buttons must have discernible text",
+            "selector": ".icon-btn",
+            "help": "Add aria-label or text content to buttons",
+            "helpUrl": "https://dequeuniversity.com/rules/axe/4.7/button-name"
+          }
+        ],
+        "passes": [
+          {
+            "type": "page",
+            "rule": "aria-allowed-attr",
+            "element": "<div role=\"navigation\">...",
+            "message": "ARIA attributes must be valid and not be prohibited",
+            "selector": "[role=\"navigation\"]",
+            "help": "Ensure ARIA attributes are used according to specification"
+          },
+          {
+            "type": "page",
+            "rule": "aria-allowed-role",
+            "element": "<main role=\"main\">...",
+            "message": "ARIA roles must be appropriate for the element",
+            "selector": "[role=\"main\"]",
+            "help": "Use semantic HTML elements when possible"
+          }
+        ],
+        "score": 92,
+        "summary": {
+          "total": 4,
+          "violations": 2,
+          "passes": 2,
+          "critical": 0,
+          "serious": 1,
+          "moderate": 1
+        }
+      }
+    },
+    "reasoning": {
+      "recommendations": [
+        {
+          "rule": "auth-autocomplete-email",
+          "issue": "Email field should have autocomplete=\"email\" or autocomplete=\"username\"",
+          "suggestion": "Add autocomplete=\"email\" to the email input field to help users with password managers",
+          "severity": "medium",
+          "type": "auth",
+          "priority": "high"
+        },
+        {
+          "rule": "auth-autocomplete-password",
+          "issue": "Password field should have autocomplete=\"current-password\"",
+          "suggestion": "Add autocomplete=\"current-password\" to the password input field",
+          "severity": "medium",
+          "type": "auth",
+          "priority": "high"
+        },
+        {
+          "rule": "color-contrast",
+          "issue": "Elements must have sufficient color contrast",
+          "suggestion": "Increase the color contrast ratio of secondary buttons to meet WCAG AA standards (4.5:1)",
+          "severity": "medium",
+          "type": "page",
+          "priority": "high"
+        },
+        {
+          "rule": "button-name",
+          "issue": "Buttons must have discernible text",
+          "suggestion": "Add aria-label to icon-only buttons to describe their function",
+          "severity": "low",
+          "type": "page",
+          "priority": "medium"
+        }
+      ],
+      "priorityFixes": [
+        {
+          "rule": "auth-autocomplete-email",
+          "issue": "Email field should have autocomplete=\"email\" or autocomplete=\"username\"",
+          "suggestion": "Add autocomplete=\"email\" to the email input field to help users with password managers",
+          "element": "input[name='email']",
+          "type": "auth"
+        },
+        {
+          "rule": "auth-autocomplete-password",
+          "issue": "Password field should have autocomplete=\"current-password\"",
+          "suggestion": "Add autocomplete=\"current-password\" to the password input field",
+          "element": "input[name='password']",
+          "type": "auth"
+        }
+      ],
+      "quickWins": [
+        {
+          "rule": "button-name",
+          "issue": "Buttons must have discernible text",
+          "suggestion": "Add aria-label to icon-only buttons to describe their function",
+          "element": ".icon-btn",
+          "type": "page"
+        }
+      ],
+      "majorIssues": [
+        {
+          "rule": "color-contrast",
+          "issue": "Elements must have sufficient color contrast",
+          "suggestion": "Increase the color contrast ratio of secondary buttons to meet WCAG AA standards (4.5:1)",
+          "element": ".secondary-btn",
+          "type": "page"
+        }
+      ],
+      "summary": {
+        "totalIssues": 5,
+        "authIssues": 3,
+        "pageIssues": 2,
+        "severityBreakdown": {
+          "critical": 3,
+          "high": 0,
+          "medium": 2,
+          "low": 0
+        },
+        "mostCommonIssues": [
+          {
+            "rule": "auth-autocomplete-email",
+            "count": 1
+          },
+          {
+            "rule": "auth-autocomplete-password",
+            "count": 1
+          },
+          {
+            "rule": "color-contrast",
+            "count": 1
+          },
+          {
+            "rule": "button-name",
+            "count": 1
+          },
+          {
+            "rule": "auth-placeholder-only",
+            "count": 1
+          }
+        ],
+        "recommendations": [
+          "Fix all authentication-related issues first as they block user access",
+          "Address high-severity issues that impact users with disabilities",
+          "Implement proper labeling for all form elements",
+          "Ensure keyboard navigation works throughout the application",
+          "Test with actual assistive technology users"
+        ]
+      }
+    }
+  },
+  "summary": {
+    "requiresAuth": true,
+    "authSuccess": true,
+    "totalIssues": 5,
+    "authIssues": 3,
+    "pageIssues": 2,
+    "overallScore": 90
+  }
+}

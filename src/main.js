@@ -170,6 +170,11 @@ function renderIssueList() {
     if (issue.severity === 'serious') icon = 'alert-triangle';
     if (issue.severity === 'moderate') icon = 'info';
     if (issue.status === 'pass') icon = 'check-circle';
+
+    // Build WCAG tag links
+    const wcagLinks = (issue.wcagTags || []).map(tag => 
+      `<a href="${tag.url}" target="_blank" rel="noopener" class="wcag-link-badge" title="View ${tag.label} guideline" onclick="event.stopPropagation();">${tag.label}</a>`
+    ).join('');
     
     return `
     <tr data-id="${issue.rule_id}" class="${issue.status === 'fixed' ? 'row-fixed' : ''}">
@@ -181,7 +186,10 @@ function renderIssueList() {
             <span class="badge-rule">${issue.rule_id}</span>
         </div>
       </td>
-      <td class="guideline-title">${issue.title}</td>
+      <td class="guideline-title">
+        <div>${issue.title}</div>
+        ${wcagLinks ? `<div style="margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap;">${wcagLinks}</div>` : ''}
+      </td>
       <td><span class="status-indicator status-${issue.status}">${issue.status}</span></td>
       ${isShowingPassed ? 
         `<td style="font-weight: 700;">${issue.elements.length} elements</td>` :
@@ -214,7 +222,35 @@ function showIssueDetails(issue) {
   document.getElementById('detail-impact').innerText = issue.why_matters || "This affects accessibility compliance.";
   document.getElementById('detail-code').textContent = issue.elements[0]?.html || "N/A";
   document.getElementById('detail-selector').innerText = issue.elements[0]?.selector || "N/A";
-  document.getElementById('detail-ai-fix').innerHTML = issue.ai_suggestion || "AI is analyzing a fix...";
+
+  // Render WCAG 2.2 reference links
+  const wcagLinksContainer = document.getElementById('detail-wcag-links');
+  const wcagTags = issue.wcagTags || [];
+  const helpUrl = issue.helpUrl || null;
+  
+  let linksHTML = '';
+  
+  // Official WCAG 2.2 success criteria links
+  wcagTags.forEach(tag => {
+    linksHTML += `<a href="${tag.url}" target="_blank" rel="noopener" class="wcag-ref-link">
+      <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
+      <span>${tag.label} — Understanding this Success Criterion</span>
+    </a>`;
+  });
+  
+  // axe-core documentation link
+  if (helpUrl) {
+    linksHTML += `<a href="${helpUrl}" target="_blank" rel="noopener" class="wcag-ref-link" style="background: #e0f2fe;">
+      <i data-lucide="book-open" style="width: 14px; height: 14px;"></i>
+      <span>Deque axe-core: ${issue.rule_id} rule documentation</span>
+    </a>`;
+  }
+  
+  if (!linksHTML) {
+    linksHTML = '<span style="color: #9e9e9e; font-size: 0.85rem;">No WCAG mapping available for this rule.</span>';
+  }
+  
+  wcagLinksContainer.innerHTML = linksHTML;
   
   const badge = document.getElementById('detail-badge');
   badge.className = `badge badge-${issue.severity}`;
@@ -233,15 +269,57 @@ function showIssueDetails(issue) {
       evidenceSection.classList.add('hidden');
   }
 
-  detailPanel.classList.remove('hidden');
+  // Reset AI Fix section: show button, hide result
+  const aiFixBtn = document.getElementById('get-ai-fix-btn');
+  const aiFixResult = document.getElementById('ai-fix-result');
+  aiFixBtn.classList.remove('hidden');
+  aiFixBtn.disabled = false;
+  aiFixBtn.innerHTML = `<i data-lucide="sparkles" style="width: 18px; height: 18px;"></i> Get AI Fix Suggestion`;
+  aiFixResult.classList.add('hidden');
+  document.getElementById('detail-ai-fix').innerHTML = '...';
   
-  // Auto-send a message to AI about this issue if chat is empty or just to provide context
-  addChatMessage(`I'm looking at issue **${issue.rule_id}: ${issue.title}**. What's the best way to fix this?`, 'user');
-  socket.emit('chat-message', {
-    text: `Provide a detailed explanation and fix for ${issue.rule_id}`,
-    context: { issue, domSummary: "..." }
-  });
+  if (window.lucide) lucide.createIcons();
+
+  detailPanel.classList.remove('hidden');
 }
+
+// --- On-Demand AI Fix Button ---
+document.getElementById('get-ai-fix-btn')?.addEventListener('click', () => {
+  const issue = state.activeIssue;
+  if (!issue) return;
+
+  const aiFixBtn = document.getElementById('get-ai-fix-btn');
+  const aiFixResult = document.getElementById('ai-fix-result');
+
+  // Show loading state
+  aiFixBtn.disabled = true;
+  aiFixBtn.innerHTML = `<i data-lucide="loader" style="width: 18px; height: 18px;" class="spin-icon"></i> Analyzing...`;
+  if (window.lucide) lucide.createIcons();
+
+  // Request AI fix from server
+  socket.emit('get-ai-fix', {
+    issue: issue,
+    context: { domSummary: "..." }
+  });
+});
+
+// Listen for AI fix response
+socket.on('ai-fix-response', (data) => {
+  const aiFixBtn = document.getElementById('get-ai-fix-btn');
+  const aiFixResult = document.getElementById('ai-fix-result');
+
+  // Hide button, show result
+  aiFixBtn.classList.add('hidden');
+  aiFixResult.classList.remove('hidden');
+  document.getElementById('detail-ai-fix').innerHTML = data.suggestion || "AI could not generate a suggestion.";
+  
+  // Also store it on the issue so re-opening doesn't lose it
+  if (state.activeIssue) {
+    state.activeIssue.ai_suggestion = data.suggestion;
+  }
+
+  if (window.lucide) lucide.createIcons();
+});
 
 // --- Copy Report Feature ---
 const copyBtn = document.getElementById('copy-issue-btn');
@@ -355,6 +433,15 @@ function addChatMessage(text, sender) {
 function handleStartScan(url) {
   if (!url) return alert("Please enter a valid URL");
   
+  // Check if authentication is enabled and credentials are provided
+  const enableAuth = document.getElementById('enable-auth').checked;
+  const authUsername = document.getElementById('auth-username').value;
+  const authPassword = document.getElementById('auth-password').value;
+  
+  if (enableAuth && (!authUsername || !authPassword)) {
+    return alert("Please provide both username and password for authentication");
+  }
+  
   if (!socket.connected) {
     console.warn("⚠️ Cannot start scan: Socket not connected.");
     alert("Connection to scanning engine lost. Waiting for reconnection...");
@@ -372,11 +459,24 @@ function handleStartScan(url) {
   if (urlDisplay) urlDisplay.innerText = url;
 
   console.log(`📤 EMITTING start-scan for: ${url}`);
+  
+  // Prepare scan options
+  const scanOptions = {
+    aiAssisted: document.getElementById('ai-assisted').checked
+  };
+  
+  // Add authentication options if enabled
+  if (enableAuth) {
+    scanOptions.enableAuth = true;
+    scanOptions.credentials = {
+      username: authUsername,
+      password: authPassword
+    };
+  }
+  
   socket.emit('start-scan', {
     url: url,
-    options: {
-      aiAssisted: document.getElementById('ai-assisted').checked
-    }
+    options: scanOptions
   });
 }
 
@@ -388,6 +488,12 @@ document.getElementById('inline-scan-btn')?.addEventListener('click', () => {
     const inlineInput = document.getElementById('inline-url');
     handleStartScan(inlineInput.value.trim());
     inlineInput.value = '';
+});
+
+// Authentication checkbox toggle
+document.getElementById('enable-auth')?.addEventListener('change', (e) => {
+    const authCredentials = document.getElementById('auth-credentials');
+    authCredentials.style.display = e.target.checked ? 'flex' : 'none';
 });
 
 sendChatBtn.addEventListener('click', () => {
