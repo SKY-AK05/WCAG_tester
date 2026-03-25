@@ -119,12 +119,19 @@ async function runScan(targetUrl, socket, options = {}) {
     const browserlessToken = process.env.BROWSERLESS_API_KEY;
     
     if (browserlessToken) {
-      // Robustly construct the Browserless cloud endpoint
       const cleanToken = browserlessToken.includes('token=') ? browserlessToken.split('token=')[1] : browserlessToken;
-      const wsEndpoint = `wss://production-sfo.browserless.io/playwright?token=${cleanToken.trim()}`;
+      const wsEndpointPlaywright = `wss://production-sfo.browserless.io/playwright?token=${cleanToken.trim()}`;
+      const wsEndpointRoot = `wss://production-sfo.browserless.io/?token=${cleanToken.trim()}`;
       
-      console.log(`[BROWSER] 🌐 Connecting to Browserless.io SFO: ${wsEndpoint.substring(0, 48)}...`);
-      browser = await chromium.connect({ wsEndpoint });
+      console.log(`[BROWSER] 🌐 Connecting to Browserless.io SFO...`);
+      try {
+        browser = await chromium.connect({ wsEndpoint: wsEndpointPlaywright });
+        console.log(`[BROWSER] ✅ Connected via /playwright endpoint`);
+      } catch (err) {
+        console.warn(`[BROWSER] ⚠️ /playwright failed, retrying with root endpoint...`);
+        browser = await chromium.connect({ wsEndpoint: wsEndpointRoot });
+        console.log(`[BROWSER] ✅ Connected via root endpoint`);
+      }
     } else {
       console.log(`[BROWSER] 💻 Launching local instance (Headed)...`);
       browser = await chromium.launch({ 

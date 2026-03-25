@@ -17,9 +17,16 @@ class AuthAgent {
 
     if (browserlessToken) {
       const cleanToken = browserlessToken.includes('token=') ? browserlessToken.split('token=')[1] : browserlessToken;
-      const wsEndpoint = `wss://production-sfo.browserless.io/playwright?token=${cleanToken.trim()}`;
-      console.log(`[AUTH-AGENT] 🌐 Connecting to Browserless.io SFO: ${wsEndpoint.substring(0, 48)}...`);
-      this.browser = await chromium.connect({ wsEndpoint });
+      const wsEndpointPlaywright = `wss://production-sfo.browserless.io/playwright?token=${cleanToken.trim()}`;
+      const wsEndpointRoot = `wss://production-sfo.browserless.io/?token=${cleanToken.trim()}`;
+      
+      console.log(`[AUTH] 🌐 Connecting to Browserless.io SFO...`);
+      try {
+        this.browser = await chromium.connect({ wsEndpoint: wsEndpointPlaywright });
+      } catch (err) {
+        console.warn(`[AUTH] ⚠️ /playwright failed, retrying root...`);
+        this.browser = await chromium.connect({ wsEndpoint: wsEndpointRoot });
+      }
     } else {
       console.log(`[AUTH-AGENT] 💻 Launching local instance (Heads-up)...`);
       this.browser = await chromium.launch({ 
