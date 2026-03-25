@@ -53,7 +53,7 @@ const chatMessages = document.getElementById('chat-messages');
 lucide.createIcons();
 
 // --- Socket.io Connection ---
-const SOCKET_URL = "http://localhost:3001";
+const SOCKET_URL = "https://wcag-tester.onrender.com";
 const socket = io(SOCKET_URL, {
   reconnectionAttempts: 5,
   timeout: 10000
