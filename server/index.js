@@ -121,9 +121,9 @@ async function runScan(targetUrl, socket, options = {}) {
     if (browserlessToken) {
       // Robustly construct the Browserless cloud endpoint
       const cleanToken = browserlessToken.includes('token=') ? browserlessToken.split('token=')[1] : browserlessToken;
-      const wsEndpoint = `wss://chrome.browserless.io/playwright?token=${cleanToken.trim()}`;
+      const wsEndpoint = `wss://production-sfo.browserless.io/playwright?token=${cleanToken.trim()}`;
       
-      console.log(`[BROWSER] 🌐 Connecting to Browserless.io Cloud: ${wsEndpoint.substring(0, 40)}...`);
+      console.log(`[BROWSER] 🌐 Connecting to Browserless.io SFO: ${wsEndpoint.substring(0, 48)}...`);
       browser = await chromium.connect({ wsEndpoint });
     } else {
       console.log(`[BROWSER] 💻 Launching local instance (Headed)...`);
