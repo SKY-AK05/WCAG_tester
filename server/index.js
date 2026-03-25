@@ -9,6 +9,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { fileURLToPath } from 'url';
 import path from 'path';
 import AuthIntegration from './authIntegration.js';
+import { extractWcagTags, mapToWCAGLevel } from './wcagUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -96,6 +97,7 @@ async function runScan(targetUrl, socket, options = {}) {
       if (authResults) {
         console.log('✅ Authenticated scan completed');
         socket.emit('scan-complete', authResults);
+        await authIntegration.cleanup(); // Free memory
         return;
       }
     }
@@ -252,18 +254,6 @@ async function runScan(targetUrl, socket, options = {}) {
 
 // --- Helpers ---
 
-function mapToWCAGLevel(ruleId) {
-  const mapping = {
-    'color-contrast': 'AA',
-    'image-alt': 'A',
-    'label': 'A',
-    'link-name': 'A',
-    'button-name': 'A',
-    'aria-roles': 'A'
-  };
-  return mapping[ruleId] || 'AA';
-}
-
 function calculateScore(issues) {
   const penalty = issues.reduce((acc, i) => {
     const p = i.severity === 'critical' ? 8 : (i.severity === 'serious' ? 4 : 1);
@@ -271,91 +261,6 @@ function calculateScore(issues) {
   }, 0);
   return Math.max(0, 100 - penalty);
 }
-
-/**
- * Extract WCAG success criteria from axe-core tags and generate official URLs.
- * axe-core tags look like: ['wcag2a', 'wcag111', 'cat.text-alternatives']
- * 'wcag111' = WCAG SC 1.1.1, 'wcag143' = WCAG SC 1.4.3, etc.
- */
-function extractWcagTags(tags) {
-  // Map WCAG SC numbers to their URL slugs on w3.org
-  const scToSlug = {
-    '111': 'non-text-content',
-    '121': 'audio-only-and-video-only-prerecorded',
-    '122': 'captions-prerecorded',
-    '123': 'audio-description-or-media-alternative-prerecorded',
-    '131': 'info-and-relationships',
-    '132': 'meaningful-sequence',
-    '133': 'sensory-characteristics',
-    '141': 'use-of-color',
-    '142': 'audio-control',
-    '143': 'contrast-minimum',
-    '144': 'resize-text',
-    '145': 'images-of-text',
-    '146': 'contrast-enhanced',
-    '211': 'keyboard',
-    '212': 'no-keyboard-trap',
-    '214': 'character-key-shortcuts',
-    '221': 'timing-adjustable',
-    '222': 'pause-stop-hide',
-    '231': 'three-flashes-or-below-threshold',
-    '241': 'bypass-blocks',
-    '242': 'page-titled',
-    '243': 'focus-order',
-    '244': 'link-purpose-in-context',
-    '245': 'multiple-ways',
-    '246': 'headings-and-labels',
-    '247': 'focus-visible',
-    '251': 'pointer-gestures',
-    '252': 'pointer-cancellation',
-    '253': 'label-in-name',
-    '254': 'motion-actuation',
-    '255': 'target-size-minimum',
-    '256': 'dragging-movements',
-    '257': 'target-size-minimum',
-    '311': 'language-of-page',
-    '312': 'language-of-parts',
-    '321': 'on-focus',
-    '322': 'on-input',
-    '323': 'consistent-navigation',
-    '324': 'consistent-identification',
-    '331': 'error-identification',
-    '332': 'labels-or-instructions',
-    '333': 'error-suggestion',
-    '411': 'parsing',
-    '412': 'name-role-value',
-    '413': 'status-messages',
-  };
-
-  const results = [];
-  
-  for (const tag of tags) {
-    // Match tags like 'wcag111', 'wcag143', 'wcag2a', 'wcag21a', etc.
-    const scMatch = tag.match(/^wcag(\d{3,4})$/);
-    if (scMatch) {
-      const scNum = scMatch[1];
-      // Format: '111' → '1.1.1', '143' → '1.4.3'
-      const formatted = scNum.length === 3 
-        ? `${scNum[0]}.${scNum[1]}.${scNum[2]}`
-        : `${scNum[0]}.${scNum[1]}.${scNum[2]}${scNum[3]}`;
-      
-      const slug = scToSlug[scNum.substring(0, 3)] || null;
-      const url = slug 
-        ? `https://www.w3.org/WAI/WCAG22/Understanding/${slug}.html`
-        : `https://www.w3.org/WAI/WCAG22/quickref/#${formatted.replace(/\./g, '')}`;
-      
-      results.push({
-        criterion: formatted,
-        label: `WCAG ${formatted}`,
-        url: url
-      });
-    }
-  }
-
-  return results;
-}
-
-// --- Socket.io Events ---
 
 io.on('connection', (socket) => {
   console.log(`[SOCKET] User connected: ${socket.id}`);

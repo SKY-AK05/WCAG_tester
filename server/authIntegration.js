@@ -1,5 +1,6 @@
 // Import the authenticated auditor
 import Orchestrator from '../src/auth-auditor/core/orchestrator.js';
+import { extractWcagTags, mapToWCAGLevel } from './wcagUtils.js';
 
 /**
  * Integration layer to connect authenticated auditor with existing WCAG tool
@@ -31,6 +32,9 @@ class AuthIntegration {
     } catch (error) {
       console.error('Authenticated scan failed:', error);
       throw error;
+    } finally {
+      // Ensure browser is ALWAYS cleaned up to avoid RAM exhaustion on Render
+      await this.cleanup();
     }
   }
 
@@ -50,7 +54,7 @@ class AuthIntegration {
           description: v.help || v.message,
           status: 'fail',
           severity: v.severity === 'high' ? 'critical' : (v.severity === 'medium' ? 'serious' : 'moderate'),
-          level: 'AA',
+          level: mapToWCAGLevel(v.rule),
           category: 'Authentication',
           elements: [{
             html: v.element,
@@ -59,7 +63,8 @@ class AuthIntegration {
             screenshot: null
           }],
           why_matters: v.explanation || 'Authentication issues prevent users from accessing the application',
-          ai_suggestion: v.fix || 'Follow WCAG 2.2 guidelines for authentication forms'
+          ai_suggestion: v.fix || 'Follow WCAG 2.2 guidelines for authentication forms',
+          wcagTags: extractWcagTags(v.tags || [])
         });
       });
     }
@@ -72,7 +77,7 @@ class AuthIntegration {
           description: v.help || v.message,
           status: 'fail',
           severity: v.severity === 'high' ? 'critical' : (v.severity === 'medium' ? 'serious' : 'moderate'),
-          level: 'AA',
+          level: mapToWCAGLevel(v.rule),
           category: 'Page Content',
           elements: [{
             html: v.element,
@@ -81,7 +86,8 @@ class AuthIntegration {
             screenshot: null
           }],
           why_matters: v.explanation || 'This affects accessibility compliance',
-          ai_suggestion: v.fix || 'Refer to WCAG 2.2 guidelines'
+          ai_suggestion: v.fix || 'Refer to WCAG 2.2 guidelines',
+          wcagTags: extractWcagTags(v.tags || [])
         });
       });
     }
@@ -95,7 +101,7 @@ class AuthIntegration {
           description: p.help || p.message,
           status: 'pass',
           severity: 'minor',
-          level: 'AA',
+          level: mapToWCAGLevel(p.rule),
           category: 'Authentication',
           elements: [{
             html: p.element,
@@ -104,7 +110,8 @@ class AuthIntegration {
             screenshot: null
           }],
           why_matters: 'This accessibility rule has been successfully implemented',
-          ai_suggestion: 'No action needed - this rule is properly implemented'
+          ai_suggestion: 'No action needed - this rule is properly implemented',
+          wcagTags: extractWcagTags(p.tags || [])
         });
       });
     }
@@ -117,7 +124,7 @@ class AuthIntegration {
           description: p.help || p.message,
           status: 'pass',
           severity: 'minor',
-          level: 'AA',
+          level: mapToWCAGLevel(p.rule),
           category: 'Page Content',
           elements: [{
             html: p.element,
@@ -126,7 +133,8 @@ class AuthIntegration {
             screenshot: null
           }],
           why_matters: 'This accessibility rule has been successfully implemented',
-          ai_suggestion: 'No action needed - this rule is properly implemented'
+          ai_suggestion: 'No action needed - this rule is properly implemented',
+          wcagTags: extractWcagTags(p.tags || [])
         });
       });
     }

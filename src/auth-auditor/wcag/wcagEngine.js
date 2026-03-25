@@ -409,7 +409,8 @@ class WcagEngine {
           message: violation.description,
           selector: node.target.join(' > '),
           help: violation.help,
-          helpUrl: violation.helpUrl
+          helpUrl: violation.helpUrl,
+          tags: violation.tags || []
         });
       });
     });
@@ -423,7 +424,8 @@ class WcagEngine {
           element: node.html.substring(0, 200),
           message: pass.description,
           selector: node.target.join(' > '),
-          help: pass.help
+          help: pass.help,
+          tags: pass.tags || []
         });
       });
     });
@@ -437,7 +439,8 @@ class WcagEngine {
         element: violation.element,
         message: violation.message,
         selector: violation.selector,
-        help: this.getAuthRuleHelp(violation.rule)
+        help: this.getAuthRuleHelp(violation.rule),
+        tags: ['wcag332', 'wcag131'] // Default tags for form accessibility
       });
     });
 
