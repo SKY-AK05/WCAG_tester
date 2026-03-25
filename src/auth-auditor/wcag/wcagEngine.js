@@ -25,10 +25,10 @@ class WcagEngine {
     const browserlessToken = process.env.BROWSERLESS_API_KEY;
 
     if (browserlessToken) {
-      console.log(`[WCAG-ENGINE] 🌐 Connecting to Browserless.io Cloud (Direct Playwright)...`);
-      this.browser = await chromium.connect({ 
-        wsEndpoint: `wss://chrome.browserless.io/playwright?token=${browserlessToken}` 
-      });
+      const cleanToken = browserlessToken.includes('token=') ? browserlessToken.split('token=')[1] : browserlessToken;
+      const wsEndpoint = `wss://chrome.browserless.io/playwright?token=${cleanToken.trim()}`;
+      console.log(`[WCAG-ENGINE] 🌐 Connecting to Browserless.io Cloud: ${wsEndpoint.substring(0, 40)}...`);
+      this.browser = await chromium.connect({ wsEndpoint });
     } else {
       console.log(`[WCAG-ENGINE] 💻 Launching local instance (Heads-up)...`);
       this.browser = await chromium.launch({ 
