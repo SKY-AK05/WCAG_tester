@@ -16,8 +16,10 @@ class AuthAgent {
     const browserlessToken = process.env.BROWSERLESS_API_KEY;
 
     if (browserlessToken) {
-      console.log(`[AUTH-AGENT] 🌐 Connecting to Browserless.io Cloud...`);
-      this.browser = await chromium.connectOverCDP(`wss://chrome.browserless.io/playwright?token=${browserlessToken}`);
+      console.log(`[AUTH-AGENT] 🌐 Connecting to Browserless.io Cloud (Direct Playwright)...`);
+      this.browser = await chromium.connect({ 
+        wsEndpoint: `wss://chrome.browserless.io/playwright?token=${browserlessToken}` 
+      });
     } else {
       console.log(`[AUTH-AGENT] 💻 Launching local instance (Heads-up)...`);
       this.browser = await chromium.launch({ 

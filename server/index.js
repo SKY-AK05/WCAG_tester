@@ -119,8 +119,10 @@ async function runScan(targetUrl, socket, options = {}) {
     const browserlessToken = process.env.BROWSERLESS_API_KEY;
     
     if (browserlessToken) {
-      console.log(`[BROWSER] 🌐 Connecting to Browserless.io Cloud...`);
-      browser = await chromium.connectOverCDP(`wss://chrome.browserless.io/playwright?token=${browserlessToken}`);
+      console.log(`[BROWSER] 🌐 Connecting to Browserless.io Cloud (Direct Playwright)...`);
+      browser = await chromium.connect({ 
+        wsEndpoint: `wss://chrome.browserless.io/playwright?token=${browserlessToken}` 
+      });
     } else {
       console.log(`[BROWSER] 💻 Launching local instance (Headed)...`);
       browser = await chromium.launch({ 
