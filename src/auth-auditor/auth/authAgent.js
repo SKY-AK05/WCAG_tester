@@ -13,7 +13,10 @@ class AuthAgent {
   }
 
   async initialize() {
-    this.browser = await chromium.launch({ headless: true });
+    this.browser = await chromium.launch({ 
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
     this.context = await this.browser.newContext({
       viewport: { width: 1280, height: 720 },
       bypassCSP: true

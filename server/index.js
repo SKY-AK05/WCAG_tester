@@ -30,6 +30,9 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "AI_KEY_NOT_F
 // Initialize Auth Integration
 const authIntegration = new AuthIntegration();
 
+// Global lock to prevent concurrent scans (RAM exhaustion protection)
+let isScanRunning = false;
+
 // --- Scan Service ---
 
 // --- AI Service ---
@@ -83,7 +86,14 @@ async function getAIReview(issue, contextData) {
 // --- Enhanced runScan with Authentication Support ---
 
 async function runScan(targetUrl, socket, options = {}) {
-  let browser = null; // Declare browser at function level
+  if (isScanRunning) {
+    console.warn(`⚠️ Scan already in progress. Rejecting request for: ${targetUrl}`);
+    socket.emit('scan-error', { message: 'A scan is already in progress. Please wait for it to finish.' });
+    return;
+  }
+
+  isScanRunning = true;
+  let browser = null; 
   try {
     console.log(`Starting scan for: ${targetUrl}`);
     
@@ -108,7 +118,13 @@ async function runScan(targetUrl, socket, options = {}) {
     
     browser = await chromium.launch({ 
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage', // Critical for Docker/Render stability
+        '--disable-gpu',           // Further reduce memory footprint
+        '--js-flags="--max-old-space-size=256"' // Limit JS memory
+      ] 
     });
     
     console.log(`Browser launched successfully.`);
@@ -248,6 +264,7 @@ async function runScan(targetUrl, socket, options = {}) {
     console.error(`[ERROR] Scan failed:`, error.message);
     socket.emit('scan-error', { message: `Scanning error: ${error.message}` });
   } finally {
+    isScanRunning = false; // Release lock
     if (browser) await browser.close();
   }
 }
