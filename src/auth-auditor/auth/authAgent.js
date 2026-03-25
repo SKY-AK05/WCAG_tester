@@ -13,10 +13,18 @@ class AuthAgent {
   }
 
   async initialize() {
-    this.browser = await chromium.launch({ 
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    });
+    const browserlessToken = process.env.BROWSERLESS_API_KEY;
+
+    if (browserlessToken) {
+      console.log(`[AUTH-AGENT] 🌐 Connecting to Browserless.io Cloud...`);
+      this.browser = await chromium.connectOverCDP(`wss://chrome.browserless.io/playwright?token=${browserlessToken}`);
+    } else {
+      console.log(`[AUTH-AGENT] 💻 Launching local instance (Heads-up)...`);
+      this.browser = await chromium.launch({ 
+        headless: false, 
+        args: [] 
+      });
+    }
     this.context = await this.browser.newContext({
       viewport: { width: 1280, height: 720 },
       bypassCSP: true

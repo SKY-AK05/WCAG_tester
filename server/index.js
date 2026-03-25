@@ -116,16 +116,18 @@ async function runScan(targetUrl, socket, options = {}) {
     console.log('📄 Using standard scan flow');
     socket.emit('scan-progress', { status: 'Launching Browser', progress: 10, details: 'Launching Chromium...' });
     
-    browser = await chromium.launch({ 
-      headless: true,
-      args: [
-        '--no-sandbox', 
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage', // Critical for Docker/Render stability
-        '--disable-gpu',           // Further reduce memory footprint
-        '--js-flags="--max-old-space-size=256"' // Limit JS memory
-      ] 
-    });
+    const browserlessToken = process.env.BROWSERLESS_API_KEY;
+    
+    if (browserlessToken) {
+      console.log(`[BROWSER] 🌐 Connecting to Browserless.io Cloud...`);
+      browser = await chromium.connectOverCDP(`wss://chrome.browserless.io/playwright?token=${browserlessToken}`);
+    } else {
+      console.log(`[BROWSER] 💻 Launching local instance (Headed)...`);
+      browser = await chromium.launch({ 
+        headless: false, 
+        slowMo: 100 
+      });
+    }
     
     console.log(`Browser launched successfully.`);
     const context = await browser.newContext({
