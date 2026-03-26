@@ -27,7 +27,7 @@ const state = {
   activeIssue: null,
   filters: {
     level: ["A", "AA"],
-    severity: ["critical", "serious", "moderate", "minor"],
+    severity: ["critical", "high", "medium", "low"],
     status: ["fail", "review", "fixed"]
   },
   isScanning: false
@@ -53,7 +53,7 @@ const chatMessages = document.getElementById('chat-messages');
 lucide.createIcons();
 
 // --- Socket.io Connection ---
-const SOCKET_URL = "https://wcag-tester.onrender.com";
+const SOCKET_URL = "http://localhost:3001";
 const socket = io(SOCKET_URL, {
   reconnectionAttempts: 5,
   timeout: 10000
@@ -133,8 +133,20 @@ function renderIssueList() {
   console.log("Current filters:", state.filters);
   
   const filteredIssues = state.results.issues.filter(issue => {
+    // Handle both new and old severity formats for compatibility
+    const normalizedSeverity = {
+      'high': 'high',
+      'serious': 'high',     // legacy
+      'medium': 'medium', 
+      'moderate': 'medium',  // legacy
+      'low': 'low',
+      'minor': 'low',        // legacy
+      'critical': 'critical',
+      'info': 'low'
+    }[issue.severity] || issue.severity;
+    
     return state.filters.level.includes(issue.level) &&
-           state.filters.severity.includes(issue.severity) &&
+           state.filters.severity.includes(normalizedSeverity) &&
            state.filters.status.includes(issue.status) &&
            issue.status !== 'ignored';
   });
@@ -164,12 +176,24 @@ function renderIssueList() {
   }
 
   issueTableBody.innerHTML = filteredIssues.map(issue => {
-    // Map severity to an icon
+    // Map severity to an icon (handle both new and old formats)
     let icon = 'alert-circle';
     if (issue.severity === 'critical') icon = 'zap';
-    if (issue.severity === 'serious') icon = 'alert-triangle';
-    if (issue.severity === 'moderate') icon = 'info';
+    if (issue.severity === 'serious' || issue.severity === 'high') icon = 'alert-triangle';
+    if (issue.severity === 'moderate' || issue.severity === 'medium') icon = 'info';
     if (issue.status === 'pass') icon = 'check-circle';
+
+    // Normalize severity for display
+    const displaySeverity = {
+      'high': 'high',
+      'serious': 'high',     // legacy
+      'medium': 'medium', 
+      'moderate': 'medium',  // legacy
+      'low': 'low',
+      'minor': 'low',        // legacy
+      'critical': 'critical',
+      'info': 'low'
+    }[issue.severity] || issue.severity;
 
     // Build WCAG tag links
     const wcagLinks = (issue.wcagTags || []).map(tag => 
@@ -180,7 +204,7 @@ function renderIssueList() {
     <tr data-id="${issue.rule_id}" class="${issue.status === 'fixed' ? 'row-fixed' : ''}">
       <td>
         <div style="display: flex; align-items: center; gap: 12px;">
-            <div class="severity-icon severity-${issue.severity}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+            <div class="severity-icon severity-${displaySeverity}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
                 <i data-lucide="${icon}" style="width: 16px; height: 16px;"></i>
             </div>
             <span class="badge-rule">${issue.rule_id}</span>
@@ -193,7 +217,7 @@ function renderIssueList() {
       <td><span class="status-indicator status-${issue.status}">${issue.status}</span></td>
       ${isShowingPassed ? 
         `<td style="font-weight: 700;">${issue.elements.length} elements</td>` :
-        `<td><span class="badge badge-${issue.severity}">${issue.severity}</span></td>
+        `<td><span class="badge badge-${displaySeverity}">${displaySeverity}</span></td>
          <td style="font-weight: 700;">${issue.elements.length} elements</td>`
       }
     </tr>
@@ -218,10 +242,101 @@ function renderIssueList() {
 function showIssueDetails(issue) {
   state.activeIssue = issue;
   document.getElementById('detail-title').innerText = issue.title;
-  document.getElementById('detail-desc').innerText = issue.description;
-  document.getElementById('detail-impact').innerText = issue.why_matters || "This affects accessibility compliance.";
+  // Handle new severity format (critical, high, medium, low) alongside legacy (critical, serious, moderate, minor)
+  const severityMap = {
+    'critical': 'critical',
+    'high': 'high',
+    'serious': 'high',     // legacy
+    'medium': 'medium', 
+    'moderate': 'medium',  // legacy
+    'low': 'low',
+    'minor': 'low',        // legacy
+    'info': 'low'
+  };
+  const displaySeverity = severityMap[issue.severity] || issue.severity;
+  
+  // Get impact text
+  const impactText = issue.ai_explanation || issue.impact || issue.why_matters || "This affects accessibility compliance.";
+  document.getElementById('detail-impact').innerHTML = impactText;
+  
+  // Enhanced fix display
+  const fixText = issue.ai_fix || issue.fix || issue.fix_suggestion || "Review WCAG guidelines for the appropriate fix.";
+  document.getElementById('detail-ai-fix').innerHTML = fixText.replace(/\n/g, '<br>');
+  
+  // Show/hide AI fix button based on whether AI enrichment exists
+  const aiFixBtn = document.getElementById('get-ai-fix-btn');
+  const aiFixResult = document.getElementById('ai-fix-result');
+  
+  if (issue.ai_enriched || (issue.ai_explanation && issue.ai_fix)) {
+    // AI data already present, show it
+    aiFixBtn.classList.add('hidden');
+    aiFixResult.classList.remove('hidden');
+  } else {
+    // No AI data, show button for on-demand
+    aiFixBtn.classList.remove('hidden');
+    aiFixBtn.disabled = false;
+    aiFixBtn.innerHTML = `<i data-lucide="sparkles" style="width: 18px; height: 18px;"></i> Get AI Fix Suggestion`;
+    aiFixResult.classList.add('hidden');
+  }
+  
+  // Code examples display
+  if (issue.code_example) {
+    const codeExampleHtml = `
+      <div style="margin-top: 16px; padding: 16px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid var(--accent-primary);">
+        <h4 style="margin: 0 0 12px 0; font-size: 0.9rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Code Example</h4>
+        <div style="margin-bottom: 12px;">
+          <span style="font-size: 0.8rem; color: #dc2626; font-weight: 600;">❌ Incorrect:</span>
+          <pre style="margin: 8px 0; padding: 12px; background: #fff; border-radius: 4px; overflow-x: auto; font-size: 0.85rem; border: 1px solid #e5e7eb;"><code>${escapeHtml(issue.code_example.bad || '')}</code></pre>
+        </div>
+        <div>
+          <span style="font-size: 0.8rem; color: #16a34a; font-weight: 600;">✅ Correct:</span>
+          <pre style="margin: 8px 0; padding: 12px; background: #fff; border-radius: 4px; overflow-x: auto; font-size: 0.85rem; border: 1px solid #16a34a;"><code>${escapeHtml(issue.code_example.good || '')}</code></pre>
+        </div>
+      </div>
+    `;
+    // Insert after impact section if element exists
+    const codeExampleContainer = document.getElementById('detail-code-example');
+    if (codeExampleContainer) {
+      codeExampleContainer.innerHTML = codeExampleHtml;
+      codeExampleContainer.classList.remove('hidden');
+    }
+  }
+  
+  // Best practice tip
+  const bestPractice = issue.ai_best_practice || "Follow WCAG 2.2 best practices for accessible design.";
+  const bestPracticeContainer = document.getElementById('detail-best-practice');
+  if (bestPracticeContainer) {
+    bestPracticeContainer.innerHTML = `<span style="color: var(--accent-primary);">💡</span> ${bestPractice}`;
+    bestPracticeContainer.classList.remove('hidden');
+  }
+  
+  // WCAG info badge
+  const wcagBadge = document.getElementById('detail-wcag-badge');
+  if (wcagBadge) {
+    wcagBadge.innerHTML = `<strong>WCAG ${issue.wcag_id || '2.1'}</strong> Level ${issue.level || 'AA'}`;
+    wcagBadge.classList.remove('hidden');
+  }
+
+  // Category badge
+  const categoryBadge = document.getElementById('detail-category');
+  if (categoryBadge && issue.category) {
+    categoryBadge.innerText = issue.category;
+    categoryBadge.className = `badge badge-${issue.category.toLowerCase()}`;
+    categoryBadge.classList.remove('hidden');
+  }
+
+  document.getElementById('detail-desc').innerHTML = issue.description || '';
   document.getElementById('detail-code').textContent = issue.elements[0]?.html || "N/A";
   document.getElementById('detail-selector').innerText = issue.elements[0]?.selector || "N/A";
+  
+  // Show element count if multiple
+  if (issue.elements && issue.elements.length > 1) {
+    const countBadge = document.getElementById('detail-element-count');
+    if (countBadge) {
+      countBadge.innerText = `${issue.elements.length} elements affected`;
+      countBadge.classList.remove('hidden');
+    }
+  }
 
   // Render WCAG 2.2 reference links
   const wcagLinksContainer = document.getElementById('detail-wcag-links');
@@ -253,8 +368,8 @@ function showIssueDetails(issue) {
   wcagLinksContainer.innerHTML = linksHTML;
   
   const badge = document.getElementById('detail-badge');
-  badge.className = `badge badge-${issue.severity}`;
-  badge.innerText = issue.severity.toUpperCase();
+  badge.className = `badge badge-${displaySeverity}`;
+  badge.innerText = displaySeverity.toUpperCase();
 
   // Visual Evidence Screenshot
   const evidenceSection = document.getElementById('visual-evidence-section');
@@ -269,14 +384,17 @@ function showIssueDetails(issue) {
       evidenceSection.classList.add('hidden');
   }
 
-  // Reset AI Fix section: show button, hide result
-  const aiFixBtn = document.getElementById('get-ai-fix-btn');
-  const aiFixResult = document.getElementById('ai-fix-result');
+  // Reuse AI Fix section elements (already declared in enhanced section above)
   aiFixBtn.classList.remove('hidden');
   aiFixBtn.disabled = false;
   aiFixBtn.innerHTML = `<i data-lucide="sparkles" style="width: 18px; height: 18px;"></i> Get AI Fix Suggestion`;
   aiFixResult.classList.add('hidden');
   document.getElementById('detail-ai-fix').innerHTML = '...';
+  
+  // Also hide enhanced sections that might have been shown
+  const codeExampleContainer2 = document.getElementById('detail-code-example');
+  if (codeExampleContainer2) codeExampleContainer2.classList.add('hidden');
+  if (bestPracticeContainer) bestPracticeContainer.classList.add('hidden');
   
   if (window.lucide) lucide.createIcons();
 
@@ -311,17 +429,29 @@ socket.on('ai-fix-response', (data) => {
   // Hide button, show result
   aiFixBtn.classList.add('hidden');
   aiFixResult.classList.remove('hidden');
-  document.getElementById('detail-ai-fix').innerHTML = data.suggestion || "AI could not generate a suggestion.";
+  document.getElementById('detail-ai-fix').innerHTML = data.suggestion || data.ai_fix || "AI could not generate a suggestion.";
   
   // Also store it on the issue so re-opening doesn't lose it
   if (state.activeIssue) {
     state.activeIssue.ai_suggestion = data.suggestion;
+    state.activeIssue.ai_explanation = data.ai_explanation;
+    state.activeIssue.ai_fix = data.ai_fix || data.suggestion;
+    state.activeIssue.ai_best_practice = data.ai_best_practice;
+    state.activeIssue.ai_enriched = true;
   }
 
   if (window.lucide) lucide.createIcons();
 });
 
-// --- Copy Report Feature ---
+/**
+ * Escape HTML special characters
+ */
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
 const copyBtn = document.getElementById('copy-issue-btn');
 if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
@@ -333,15 +463,32 @@ ACCESSIBILITY AUDIT REPORT
 --------------------------
 ID: ${issue.rule_id}
 Title: ${issue.title}
-Severity: ${issue.severity.toUpperCase()}
-Description: ${issue.description}
-Impact: ${issue.why_matters || 'Affects accessibility compliance.'}
+WCAG: ${issue.wcag_id || 'N/A'} (Level ${issue.level || 'AA'})
+Category: ${issue.category || 'General'}
+Severity: ${(issue.severity || 'medium').toUpperCase()}
+Status: ${issue.status}
+
+Description:
+${issue.description || 'No description available'}
+
+Impact:
+${issue.ai_explanation || issue.impact || 'This affects accessibility compliance.'}
+
+Fix Instructions:
+${issue.ai_fix || issue.fix || 'Review WCAG guidelines for the appropriate fix.'}
+
+Best Practice:
+${issue.ai_best_practice || 'Follow WCAG 2.2 best practices.'}
 
 Affected Element:
 ${issue.elements[0]?.html || 'N/A'}
+Selector: ${issue.elements[0]?.selector || 'N/A'}
 
-AI Fix Suggestion:
-${(issue.ai_suggestion || '').replace(/<[^>]*>/g, '')}
+Code Example:
+${issue.code_example ? `Incorrect: ${issue.code_example.bad}\nCorrect: ${issue.code_example.good}` : 'No code example available'}
+
+References:
+${issue.wcagTags?.map(t => t.url).join('\n') || issue.help_url || 'N/A'}
         `.trim();
 
         try {
@@ -572,10 +719,10 @@ document.querySelectorAll('.pill').forEach(pill => {
         const filter = pill.getAttribute('data-filter');
         
         // Reset all filtering for severity and status before applying specific pill logic
-        state.filters.severity = ["critical", "serious", "moderate", "minor"];
+        state.filters.severity = ["critical", "high", "medium", "low"];
         state.filters.status = ["fail", "review", "fixed"];
 
-        if (filter === 'critical' || filter === 'serious' || filter === 'moderate') {
+        if (filter === 'critical' || filter === 'high' || filter === 'medium') {
             state.filters.severity = [filter];
             state.filters.status = ["fail", "review"];
         }

@@ -10,6 +10,8 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import AuthIntegration from './authIntegration.js';
 import { extractWcagTags, mapToWCAGLevel } from './wcagUtils.js';
+import { normalizeIssue, normalizePasses, createIssueSummary, sortIssuesByPriority } from './issueNormalizer.js';
+import { getAIEnrichmentService } from './aiEnrichmentService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,58 +31,92 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "AI_KEY_NOT_F
 
 // Initialize Auth Integration
 const authIntegration = new AuthIntegration();
+const aiService = getAIEnrichmentService(process.env.GEMINI_API_KEY);
 
 // Global lock to prevent concurrent scans (RAM exhaustion protection)
 let isScanRunning = false;
 
-// --- Scan Service ---
+/**
+ * Enhanced Issue Processor - Transforms axe results with AI enrichment
+ */
+async function processScanResults(axeResults, page, targetUrl, pageTitle) {
+  const allIssues = [];
 
-// --- AI Service ---
+  // Process violations (failures)
+  console.log(`[PROCESS] Processing ${axeResults.violations.length} violations...`);
+  for (const violation of axeResults.violations) {
+    const elements = await processViolationElements(violation.nodes, page);
+    const normalizedIssue = normalizeIssue(violation, 'fail', elements);
+    allIssues.push(normalizedIssue);
+  }
 
+  // Process passed rules
+  if (axeResults.passes && axeResults.passes.length > 0) {
+    console.log(`[PROCESS] Processing ${axeResults.passes.length} passed rules...`);
+    const passedIssues = normalizePasses(axeResults.passes);
+    allIssues.push(...passedIssues);
+  }
+
+  // Sort by priority (critical first)
+  const sortedIssues = sortIssuesByPriority(allIssues);
+
+  // Generate summary
+  const summary = createIssueSummary(sortedIssues);
+
+  return {
+    url: targetUrl,
+    title: pageTitle,
+    score: summary.score,
+    summary: summary,
+    issues: sortedIssues,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Process violation elements with screenshots
+ */
+async function processViolationElements(nodes, page) {
+  const elements = [];
+
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    const selector = node.target.join(' > ');
+
+    let screenshotBase64 = null;
+
+    // Only screenshot first element for performance
+    if (i === 0 && page) {
+      try {
+        const locator = page.locator(selector).first();
+        await locator.scrollIntoViewIfNeeded({ timeout: 2000 });
+        const buffer = await locator.screenshot({ timeout: 3000 });
+        screenshotBase64 = buffer.toString('base64');
+      } catch (e) {
+        // Silent fail - screenshot not critical
+      }
+    }
+
+    elements.push({
+      html: node.html,
+      selector: selector,
+      target: node.target,
+      summary: node.failureSummary || 'Accessibility violation detected',
+      screenshot: screenshotBase64
+    });
+  }
+
+  return elements;
+}
+
+// Legacy single-issue AI review (kept for backward compatibility)
 async function getAIReview(issue, contextData) {
   if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
     return "AI-driven fix analysis requires a valid Gemini API key. Please check your .env file.";
   }
 
-  const prompt = `
-    You are an expert Web Accessibility Auditor (WCAG 2.2 Specialist).
-    Analyze the following accessibility issue and provide a human-readable fix.
-    **Rule**: ${issue.title} (${issue.rule_id})
-    **WCAG Guideline**: ${issue.level}
-    **Affected Element HTML**: \`${issue.elements[0]?.html}\`
-    **Failure Summary**: ${issue.elements[0]?.summary}
-    Please provide:
-    1. **Explanation**: Why this is an issue for users with disabilities.
-    2. **Fix**: Specific code or attribute changes needed to resolve it.
-    3. **Best Practice**: A one-line tip to avoid this in the future.
-    Format the output with light HTML (bold, lists) but NO markdown backticks in the response.
-  `;
-
-  try {
-    const modelsToTry = ["gemini-flash-latest", "gemini-pro-latest", "gemini-2.0-flash", "gemini-2.5-flash"];
-    let lastError = null;
-    
-    for (const modelName of modelsToTry) {
-      try {
-        console.log(`[AI] Attempting review with: ${modelName}`);
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        return (await response.text());
-      } catch (err) {
-        lastError = err;
-        if (err.status === 404) {
-          console.warn(`[AI] Model ${modelName} not found, trying fallback...`);
-          continue;
-        }
-        throw err; 
-      }
-    }
-    throw lastError;
-  } catch (error) {
-    console.error("Gemini Error:", error.message);
-    return "AI analysis failed. Please check logs.";
-  }
+  const enriched = await aiService.enrichSingleIssue(issue);
+  return enriched.ai_explanation || enriched.ai_fix || "AI analysis completed.";
 }
 
 // --- Enhanced runScan with Authentication Support ---
@@ -170,114 +206,49 @@ async function runScan(targetUrl, socket, options = {}) {
       return await axe.run();
     });
     
-    socket.emit('scan-progress', { status: 'Processing', progress: 70, details: 'Mapping violations and passed rules to WCAG 2.2...' });
+    socket.emit('scan-progress', { status: 'Processing', progress: 70, details: 'Normalizing and enriching results...' });
     
-    // Process results and capture screenshots
-    socket.emit('scan-progress', { status: 'Capturing Evidence', progress: 70, details: 'Taking visual snippets of violations...' });
+    // Process results using enhanced normalizer
+    const report = await processScanResults(axeResults, page, targetUrl, pageTitle);
     
-    const processedIssues = [];
+    // AI Enrichment - batch process violations only
+    socket.emit('scan-progress', { status: 'AI Enrichment', progress: 85, details: 'Generating AI explanations...' });
     
-    // Process violations (failed rules)
-    for (const v of axeResults.violations) {
-      const elements = [];
+    const violations = report.issues.filter(i => i.status === 'fail');
+    if (violations.length > 0 && aiService.isAvailable()) {
+      console.log(`[SCAN] Enriching ${violations.length} violations with AI...`);
       
-      for (let i = 0; i < v.nodes.length; i++) {
-        const n = v.nodes[i];
-        const selector = n.target.join(' > ');
-        let screenshotBase64 = null;
-        
-        // Only take 1 screenshot per issue for performance
-        if (i === 0) {
-          try {
-            const locator = page.locator(selector).first();
-            // Ensure element is visible before screenshot
-            await locator.scrollIntoViewIfNeeded({ timeout: 2000 });
-            const buffer = await locator.screenshot({ timeout: 3000 });
-            screenshotBase64 = buffer.toString('base64');
-          } catch (e) {
-            console.warn(`[SCAN] Could not capture screenshot for ${selector}:`, e.message);
-          }
-        }
-        
-        elements.push({
-          html: n.html,
-          selector: selector,
-          summary: n.failureSummary,
-          screenshot: screenshotBase64
-        });
-      }
-
-      processedIssues.push({
-        rule_id: v.id,
-        title: v.help,
-        description: v.description,
-        status: 'fail',
-        severity: v.impact === 'critical' ? 'critical' : (v.impact === 'serious' ? 'serious' : (v.impact === 'moderate' ? 'moderate' : 'minor')),
-        level: mapToWCAGLevel(v.id), 
-        category: 'Perceivable',
-        elements: elements,
-        helpUrl: v.helpUrl || null,
-        wcagTags: extractWcagTags(v.tags || []),
-        why_matters: "Accessibility violations impact users with disabilities and can lead to legal non-compliance.",
-        ai_suggestion: "Pending AI Review..."
-      });
-    }
-    
-    // Process passes (passed rules)
-    if (axeResults.passes && axeResults.passes.length > 0) {
-      for (const p of axeResults.passes) {
-        const elements = [];
-        
-        for (let i = 0; i < Math.min(p.nodes.length, 3); i++) {
-          const n = p.nodes[i];
-          const selector = n.target.join(' > ');
-          
-          elements.push({
-            html: n.html,
-            selector: selector,
-            summary: "This element passes the accessibility check",
-            screenshot: null
+      const enrichedViolations = await aiService.enrichIssues(violations, {
+        batchSize: 5,
+        onlyFailures: true,
+        onProgress: (progress) => {
+          const percent = 85 + Math.round(progress.percentage * 0.1);
+          socket.emit('scan-progress', { 
+            status: 'AI Enrichment', 
+            progress: percent, 
+            details: `Processed ${progress.current}/${progress.total} issues...` 
           });
         }
-
-        processedIssues.push({
-          rule_id: p.id,
-          title: p.help,
-          description: p.description,
-          status: 'pass',
-          severity: 'minor',
-          level: mapToWCAGLevel(p.id), 
-          category: 'Perceivable',
-          elements: elements,
-          helpUrl: p.helpUrl || null,
-          wcagTags: extractWcagTags(p.tags || []),
-          why_matters: "This accessibility rule has been successfully implemented.",
-          ai_suggestion: "No action needed - this rule is properly implemented."
-        });
-      }
+      });
+      
+      // Replace violations in report with enriched versions
+      report.issues = report.issues.map(issue => {
+        if (issue.status === 'fail') {
+          const enriched = enrichedViolations.find(e => e.rule_id === issue.rule_id);
+          return enriched || issue;
+        }
+        return issue;
+      });
     }
 
-    // AI suggestions are now on-demand (triggered by user clicking 'Get AI Fix' button)
-    processedIssues.forEach(i => {
-      i.ai_suggestion = null; // Will be populated on-demand
-    });
-
-    const finalReport = {
-      url: targetUrl,
-      title: pageTitle,
-      score: calculateScore(processedIssues),
-      issues: processedIssues,
-      timestamp: new Date().toISOString()
-    };
-
-    console.log(`[SCAN] Complete! Detected ${processedIssues.filter(i => i.status === 'fail').length} violations and ${processedIssues.filter(i => i.status === 'pass').length} passed rules at score ${finalReport.score}`);
-    socket.emit('scan-complete', finalReport);
+    console.log(`[SCAN] Complete! Detected ${report.summary.violations} violations and ${report.summary.passes} passed rules at score ${report.score}`);
+    socket.emit('scan-complete', report);
     
   } catch (error) {
     console.error(`[ERROR] Scan failed:`, error.message);
     socket.emit('scan-error', { message: `Scanning error: ${error.message}` });
   } finally {
-    isScanRunning = false; // Release lock
+    isScanRunning = false;
     if (browser) await browser.close();
   }
 }
