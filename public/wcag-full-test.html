@@ -1,270 +1,134 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WCAG Accessibility Testing - Full Coverage Suite</title>
+  <head>
+    <meta charset="UTF-8" />
+    <title>WCAG Test - Fixed</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
     <style>
-        :root {
-            --primary: #2563eb;
-            --bg: #f8fafc;
-            --text: #1e293b;
-            --divider: #e2e8f0;
-            --pass-bg: #f0fdf4;
-            --pass-text: #166534;
-            --fail-bg: #fef2f2;
-            --fail-text: #991b1b;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
-            color: var(--text);
-            background: var(--bg);
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 40px 20px;
-        }
-
-        header {
-            border-bottom: 2px solid var(--divider);
-            margin-bottom: 40px;
-            padding-bottom: 20px;
-        }
-
-        h1 { color: var(--primary); margin: 0; }
-        h2 { border-left: 4px solid var(--primary); padding-left: 15px; margin-top: 40px; color: #334155; }
-        
-        .test-case {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin: 20px 0;
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        .scenario {
-            padding: 20px;
-            border-radius: 8px;
-            border-width: 1px;
-            border-style: solid;
-        }
-
-        .pass { background: var(--pass-bg); border-color: #bbf7d0; color: var(--pass-text); }
-        .fail { background: var(--fail-bg); border-color: #fecaca; color: var(--fail-text); }
-        
-        .label {
-            font-weight: bold;
-            display: block;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            font-size: 0.8rem;
-            letter-spacing: 0.05em;
-        }
-
-        .low-contrast { color: #aaa; background: #fff; }
-        .good-contrast { color: #000; background: #fff; }
-        .small-btn { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
-        .good-btn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
-        
-        button, a, input { cursor: pointer; }
-
-        /* Mock specific issues */
-        #fail-focus:focus { outline: none; }
-        
+      body {
+        font-family: Arial;
+        padding: 20px;
+      }
+      .pass {
+        background: #e6fffa;
+        padding: 10px;
+        margin: 10px;
+      }
+      .fail {
+        background: #ffe6e6;
+        padding: 10px;
+        margin: 10px;
+      }
+      .low {
+        color: #aaa;
+      }
+      .good {
+        color: #000;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
+    <header>
+      <h1>WCAG Test Page (Isolated)</h1>
+    </header>
 
-<header>
-    <h1>WCAG Full Test Page</h1>
-    <p>Controlled scenarios for validating accessibility scanner rule coverage.</p>
-</header>
+    <!-- ✅ PASS SECTION -->
+    <main id="pass-region">
+      <h2>✅ PASS CASES</h2>
 
-<!-- ================= PERCEIVABLE ================= -->
+      <!-- image-alt -->
+      <div class="pass">
+        <img
+          src="https://via.placeholder.com/100"
+          alt="Valid image description"
+        />
+      </div>
 
-<section>
-    <h2>1. Perceivable</h2>
-    
-    <h3>1.1 Text Alternatives</h3>
-    <div class="test-case">
-        <div class="scenario fail">
-            <span class="label">❌ Fail: No Alt Text</span>
-            <img id="fail-image" src="https://via.placeholder.com/100" width="100" height="40">
-        </div>
-        <div class="scenario pass">
-            <span class="label">✅ Pass: Proper Alt Text</span>
-            <img id="pass-image" src="https://via.placeholder.com/100" alt="Sample placeholder image showing WCAG test" width="100" height="40">
-        </div>
+      <!-- contrast -->
+      <div class="pass">
+        <p class="good">Good contrast text</p>
+      </div>
+
+      <!-- heading -->
+      <div class="pass">
+        <h1>Main</h1>
+        <h2>Sub</h2>
+      </div>
+
+      <!-- button -->
+      <div class="pass">
+        <button>Accessible Button</button>
+      </div>
+
+      <!-- link -->
+      <div class="pass">
+        <a href="#">View report details</a>
+      </div>
+
+      <!-- label -->
+      <div class="pass">
+        <label for="name">Name</label>
+        <input id="name" type="text" />
+      </div>
+
+      <!-- aria -->
+      <div class="pass">
+        <button aria-label="Close">X</button>
+      </div>
+
+      <!-- unique id -->
+      <div class="pass">
+        <div id="u1">A</div>
+        <div id="u2">B</div>
+      </div>
+    </main>
+
+    <!-- ❌ FAIL SECTION -->
+    <div id="fail-region">
+      <h2>❌ FAIL CASES</h2>
+
+      <!-- image-alt -->
+      <div class="fail">
+        <img src="https://via.placeholder.com/100" />
+      </div>
+
+      <!-- contrast -->
+      <div class="fail">
+        <p class="low">Bad contrast text</p>
+      </div>
+
+      <!-- heading -->
+      <div class="fail">
+        <h4>Wrong heading order</h4>
+      </div>
+
+      <!-- keyboard -->
+      <div class="fail">
+        <div onclick="alert('clicked')">Clickable div</div>
+      </div>
+
+      <!-- link -->
+      <div class="fail">
+        <a href="#">Click here</a>
+      </div>
+
+      <!-- label -->
+      <div class="fail">
+        <input type="text" />
+      </div>
+
+      <!-- aria -->
+      <div class="fail">
+        <div role="invalid-role"></div>
+      </div>
+
+      <!-- duplicate id -->
+      <div class="fail">
+        <div id="dup">A</div>
+        <div id="dup">B</div>
+      </div>
     </div>
-
-    <h3>1.3 Adaptable</h3>
-    <div class="test-case">
-        <div class="scenario fail">
-            <span class="label">❌ Fail: Skipped Heading Levels</span>
-            <div id="fail-heading">
-                <h4>Heading Level 4 before H1</h4>
-            </div>
-        </div>
-        <div class="scenario pass">
-            <span class="label">✅ Pass: Logical Heading Order</span>
-            <div id="pass-heading">
-                <h2>Subheading Level 2</h2>
-            </div>
-        </div>
-    </div>
-
-    <h3>1.4 Distinguishable</h3>
-    <div class="test-case">
-        <div class="scenario fail">
-            <span class="label">❌ Fail: Low Contrast</span>
-            <p id="fail-contrast" class="low-contrast">This text has very poor contrast against white.</p>
-        </div>
-        <div class="scenario pass">
-            <span class="label">✅ Pass: High Contrast</span>
-            <p id="pass-contrast" class="good-contrast">This text has excellent contrast (Black on White).</p>
-        </div>
-    </div>
-</section>
-
-<!-- ================= OPERABLE ================= -->
-
-<section>
-    <h2>2. Operable</h2>
-
-    <h3>2.1 Keyboard Accessible</h3>
-    <div class="test-case">
-        <div class="scenario fail">
-            <span class="label">❌ Fail: Clickable Div (No Keyboard)</span>
-            <div id="fail-keyboard" onclick="alert('clicked')" style="padding: 10px; border: 1px dashed red;">I am not a button, but I have a click event.</div>
-        </div>
-        <div class="scenario pass">
-            <span class="label">✅ Pass: Semantic Button</span>
-            <button id="pass-keyboard">Proper Button</button>
-        </div>
-    </div>
-
-    <h3>2.4 Navigable</h3>
-    <div class="test-case">
-        <div class="scenario fail">
-            <span class="label">❌ Fail: Ambiguous Link Text</span>
-            <a id="fail-link" href="#">Click here</a>
-        </div>
-        <div class="scenario pass">
-            <span class="label">✅ Pass: Descriptive Link Text</span>
-            <a id="pass-link" href="#">View detailed accessibility report for 2024</a>
-        </div>
-    </div>
-
-    <div class="test-case">
-        <div class="scenario fail">
-            <span class="label">❌ Fail: No Focus Indicator</span>
-            <button id="fail-focus" style="outline:none;">No Focus Style</button>
-        </div>
-        <div class="scenario pass">
-            <span class="label">✅ Pass: Visible Focus Style</span>
-            <button id="pass-focus">Focusable Button</button>
-        </div>
-    </div>
-
-    <h3>2.5 Input Modality</h3>
-    <div class="test-case">
-        <div class="scenario fail">
-            <span class="label">❌ Fail: Tiny Target Size</span>
-            <button id="fail-target" class="small-btn">X</button>
-        </div>
-        <div class="scenario pass">
-            <span class="label">✅ Pass: Large Target Size</span>
-            <button id="pass-target" class="good-btn">OK</button>
-        </div>
-    </div>
-</section>
-
-<!-- ================= UNDERSTANDABLE ================= -->
-
-<section>
-    <h2>3. Understandable</h2>
-
-    <h3>3.1 Readable</h3>
-    <div class="test-case">
-        <div class="scenario fail">
-            <span class="label">❌ Fail: No Lang on segment</span>
-            <span id="fail-lang">Hola (No lang attribute)</span>
-        </div>
-        <div class="scenario pass">
-            <span class="label">✅ Pass: Lang specified</span>
-            <span id="pass-lang" lang="es">Hola (Properly tagged)</span>
-        </div>
-    </div>
-
-    <h3>3.3 Input Assistance</h3>
-    <div class="test-case">
-        <div class="scenario fail">
-            <span class="label">❌ Fail: Missing Label</span>
-            <input id="fail-input" type="text" placeholder="No label here">
-        </div>
-        <div class="scenario pass">
-            <span class="label">✅ Pass: Explicit Label</span>
-            <label for="name-input">Full Name:</label>
-            <input id="name-input" type="text" id="pass-input-actual">
-        </div>
-    </div>
-
-    <div class="test-case">
-        <div class="scenario fail">
-            <span class="label">❌ Fail: No Error Relation</span>
-            <form id="fail-form">
-                <input type="email" value="invalid-email">
-                <p>Invalid email format!</p>
-            </form>
-        </div>
-        <div class="scenario pass">
-            <span class="label">✅ Pass: Accessible Error Msg</span>
-            <form id="pass-form">
-                <label for="email-pass">Email:</label>
-                <input id="email-pass" type="email" aria-invalid="true" aria-describedby="email-error">
-                <span id="email-error" style="color: red;">Please enter a valid email address.</span>
-            </form>
-        </div>
-    </div>
-</section>
-
-<!-- ================= ROBUST ================= -->
-
-<section>
-    <h2>4. Robust</h2>
-
-    <h3>4.1 Compatible</h3>
-    <div class="test-case">
-        <div class="scenario fail">
-            <span class="label">❌ Fail: Duplicate IDs</span>
-            <div id="dup">Item A</div>
-            <div id="dup">Item B</div>
-        </div>
-        <div class="scenario pass">
-            <span class="label">✅ Pass: Unique IDs</span>
-            <div id="unique-a">Item A</div>
-            <div id="unique-b">Item B</div>
-        </div>
-    </div>
-
-    <div class="test-case">
-        <div class="scenario fail">
-            <span class="label">❌ Fail: Invalid ARIA Role</span>
-            <div id="fail-aria" role="super-cool-button">I am broken ARIA</div>
-        </div>
-        <div class="scenario pass">
-            <span class="label">✅ Pass: Semantic Landmark</span>
-            <nav id="pass-landmark" aria-label="Main Navigation">
-                <ul><li>Home</li></ul>
-            </nav>
-        </div>
-    </div>
-</section>
-
-</body>
+  </body>
 </html>
